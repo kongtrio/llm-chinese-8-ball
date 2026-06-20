@@ -1,0 +1,20 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #1a1a1a; color: #ddd; font: 14px/1.4 system-ui, sans-serif; }
+#wrap { display: flex; gap: 16px; padding: 16px; flex-wrap: wrap; align-items: flex-start; }
+canvas.table { background: #2a2a2a; border-radius: 8px; display: block; flex: none; }
+#side { width: 320px; display: flex; flex-direction: column; gap: 12px; }
+.card { background: #242424; border: 1px solid #333; border-radius: 8px; padding: 10px 12px; }
+h3 { margin: 0 0 8px; font-size: 13px; color: #9ad; text-transform: uppercase; letter-spacing: .5px; }
+label { display: block; margin: 6px 0 2px; color: #aaa; }
+select, input[type=password], input[type=text] { width: 100%; padding: 5px; background: #1a1a1a; color: #ddd; border: 1px solid #444; border-radius: 4px; }
+input[type=range] { width: 100%; }
+button { padding: 7px 12px; background: #345; color: #fff; border: 0; border-radius: 5px; cursor: pointer; font-size: 13px; }
+button:hover { background: #467; }
+#status { font-size: 15px; min-height: 40px; }
+#log { height: 170px; overflow-y: auto; font: 12px/1.45 ui-monospace, monospace; white-space: pre-wrap; color: #bbb; }
+#log .you { color: #9ad; } #log .err { color: #e88; } #log .win { color: #9e9; }
+.spinpad { display: flex; gap: 12px; align-items: center; }
+.prow { display: flex; gap: 8px; }
+.prow select:first-child { flex: 0 0 90px; } .prow select:last-child { flex: 1; }
+.hint { color: #777; font-size: 12px; }
