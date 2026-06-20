@@ -137,7 +137,7 @@ export default function App() {
           <button onClick={() => engineRef.current?.newGame(players)}>{t.newGame}</button>
         </div>
 
-        <details className="card shotCard optionPanel">
+        <details className="card shotCard optionPanel" open>
           <summary>{t.yourShot}</summary>
           <div className="optionBody">
             <label className="meterLabel"><span>{t.pullPower}</span><strong>{pullPower}%</strong></label>
@@ -151,7 +151,7 @@ export default function App() {
           </div>
         </details>
 
-        <details className="card playersCard optionPanel">
+        <details className="card playersCard optionPanel" open>
           <summary>{t.players}</summary>
           <div className="optionBody">
             <div className="playersGrid">
@@ -205,7 +205,7 @@ export default function App() {
           <p className="hint">{t.apiHelp}</p>
         </details>
 
-        <details className="card compactPanel logPanel">
+        <details className="card compactPanel logPanel" open>
           <summary>{t.log}</summary>
           <div id="log">
             {eng?.log.map((l, i) => <div key={i} className={l.cls}>{l.text}</div>)}

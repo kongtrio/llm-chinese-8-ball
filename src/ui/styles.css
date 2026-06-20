@@ -31,18 +31,17 @@ input {
 }
 
 #wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 12px;
   height: 100vh;
   min-height: 560px;
-  padding: 10px;
+  padding: 12px;
   overflow: hidden;
 }
 
 #playArea {
   display: flex;
-  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
 }
@@ -63,14 +62,15 @@ input {
 }
 
 h1 {
-  margin: 4px 0 0;
-  font-size: 24px;
-  line-height: .95;
+  margin: 3px 0 0;
+  font-size: 20px;
+  line-height: 1;
   font-weight: 800;
 }
 
 .langSelect {
-  width: 132px;
+  width: 104px;
+  flex: none;
 }
 
 .tableShell {
@@ -78,8 +78,10 @@ h1 {
   align-items: center;
   justify-content: center;
   width: 100%;
+  height: 100%;
+  min-width: 0;
   min-height: 0;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid rgba(216,173,103,.28);
   border-radius: 8px;
   background:
@@ -90,10 +92,10 @@ h1 {
 
 canvas.table {
   display: block;
-  width: min(100%, calc((100vh - 198px) * 1.889));
+  width: auto;
+  height: auto;
   max-width: 100%;
   max-height: 100%;
-  height: auto;
   aspect-ratio: 956 / 506;
   border-radius: 8px;
   background: #0d1713;
@@ -107,12 +109,13 @@ canvas.table:active {
 }
 
 #side {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: stretch;
-  overflow: visible;
-  padding-bottom: 3px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
 }
 
 .card {
@@ -255,13 +258,9 @@ button:active {
   font-size: 12px;
 }
 
-.playersCard[open] {
-  grid-column: span 2;
-}
-
 .playersGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -376,16 +375,9 @@ summary {
   min-width: 0;
 }
 
-.compactPanel[open] {
-  grid-column: span 2;
-}
-
-.logPanel[open] {
-  grid-column: span 2;
-}
-
-@media (max-width: 680px) {
+@media (max-width: 860px) {
   #wrap {
+    grid-template-columns: 1fr;
     height: auto;
     min-height: 100svh;
     overflow: visible;
@@ -393,7 +385,11 @@ summary {
   }
 
   #side {
-    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  #playArea {
+    min-height: 64vh;
   }
 
   .langSelect {
@@ -401,26 +397,10 @@ summary {
   }
 
   .tableShell {
-    padding: 7px;
-  }
-
-  canvas.table {
-    width: 100%;
-  }
-
-  .statusCard,
-  .playersCard,
-  .compactPanel[open],
-  .logPanel[open] {
-    grid-column: auto;
+    padding: 8px;
   }
 
   .spinpad {
     gap: 8px;
-  }
-
-  .spinCanvas {
-    width: 86px !important;
-    height: 86px !important;
   }
 }
