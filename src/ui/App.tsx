@@ -1,8 +1,20 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'react'
 import { GameEngine } from '../game/engine'
-import { CANVAS_W, CANVAS_H } from '../game/constants'
-import type { PlayerConfig, PlayerType } from '../game/types'
+import { CANVAS_W, CANVAS_H, colorOf, isStripe } from '../game/constants'
+import { groupOf } from '../game/types'
+import type { Ball, Group, PlayerConfig, PlayerType } from '../game/types'
 import { SpinPad } from './SpinPad'
+
+function BallChip({ n }: { n: number }) {
+  const c = colorOf(n)
+  const style: CSSProperties = isStripe(n)
+    ? { background: `linear-gradient(${c} 0 28%, #fff 28% 72%, ${c} 72% 100%)` }
+    : { background: c }
+  return <span className="chip" style={style}><span className="chipnum">{n}</span></span>
+}
+
+const remainingNums = (balls: Ball[], g: Group) =>
+  balls.filter(b => b.num !== 0 && !b.potted && groupOf(b.num) === g).map(b => b.num).sort((a, b) => a - b)
 
 const MODELS: [string, { value: string; label: string }[]][] = [
   ['Claude (Anthropic)', [
@@ -93,24 +105,41 @@ export default function App() {
 
         <div className="card">
           <h3>Players</h3>
-          {players.map((p, i) => (
-            <div key={i}>
-              <label>Player {i + 1}</label>
-              <div className="prow">
-                <select value={p.type} onChange={e => setPlayer(i, { type: e.target.value as PlayerType })}>
-                  <option value="human">Human</option>
-                  <option value="llm">LLM</option>
-                </select>
-                <select value={p.model} onChange={e => setPlayer(i, { model: e.target.value })}>
-                  {MODELS.map(([grp, opts]) => (
-                    <optgroup key={grp} label={grp}>
-                      {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
+          {players.map((p, i) => {
+            const group = eng?.players[i]?.group ?? null
+            const remaining = eng && group ? remainingNums(eng.balls, group) : []
+            const onEight = !!(eng && group && remaining.length === 0)
+            const active = !!eng && !eng.gameOver && eng.current === i
+            return (
+              <div key={i} className={'player' + (active ? ' active' : '')}>
+                <label>
+                  {active && <span className="turn">▶ </span>}Player {i + 1}
+                  {active && <span className="turn"> · to play</span>}
+                  {group && <span className="grouptag">{group === 'solid' ? 'Solids' : 'Stripes'}</span>}
+                </label>
+                <div className="prow">
+                  <select value={p.type} onChange={e => setPlayer(i, { type: e.target.value as PlayerType })}>
+                    <option value="human">Human</option>
+                    <option value="llm">LLM</option>
+                  </select>
+                  <select value={p.model} onChange={e => setPlayer(i, { model: e.target.value })}>
+                    {MODELS.map(([grp, opts]) => (
+                      <optgroup key={grp} label={grp}>
+                        {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                {group ? (
+                  <div className="balls">
+                    {onEight
+                      ? <><BallChip n={8} /><span className="hint">— on the 8-ball</span></>
+                      : remaining.map(n => <BallChip key={n} n={n} />)}
+                  </div>
+                ) : <div className="balls hint">group decided on first pot</div>}
               </div>
-            </div>
-          ))}
+            )
+          })}
           <p className="hint">Each LLM player uses its own model — pit Claude against GPT. Applies on New Game.</p>
         </div>
 
