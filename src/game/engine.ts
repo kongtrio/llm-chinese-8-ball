@@ -1,9 +1,10 @@
-import { L, W, BR, CANVAS_W, CANVAS_H, MAX_CUE, TIME_SCALE } from './constants'
+import { L, W, BR, CANVAS_W, CANVAS_H, TIME_SCALE } from './constants'
 import type { Ball, PlayerConfig, RuntimePlayer, ShotCtx } from './types'
 import { rack, onTable, objectBalls, remainingOf, freeSpot, spotFree } from './table'
 import { advance, allStopped } from './physics'
 import { evaluateShot } from './rules'
 import { render, toMetres, type PullView } from './render'
+import { computeShot } from './shoot'
 import { getMove, buildPrompt, provider } from '../ai/llm'
 import { loadMemory, saveMemory, clearMemory as clearMemoryStore, nextGameId, formatHistory, type ShotRecord } from '../ai/memory'
 import { text, type Language } from '../i18n'
@@ -144,20 +145,14 @@ export class GameEngine {
 
   shoot(angle: number, power: number, spinX: number, spinY: number, intent?: string) {
     const c = this.cue()
-    const pw = Math.max(0, Math.min(1, power))
-    const sp = pw * MAX_CUE
-    let sx = spinX || 0, sy = spinY || 0; const m = Math.hypot(sx, sy); if (m > 1) { sx /= m; sy /= m }  // no miscue
-    const dx = Math.cos(angle), dy = Math.sin(angle)
+    const { vx, vy, wx, wy, wz, pw, sx, sy } = computeShot(angle, power, spinX, spinY)
     const p = this.players[this.current]
     this.pending = {                                 // captured now; completed with the outcome in resolve()
       player: this.current, who: p.name, model: p.type === 'llm' ? p.model : null,
       group: p.group as 'solid' | 'stripe' | null, cue: { x: Math.round(c.x * 100), y: Math.round(c.y * 100) },
       aim: ((angle * 180 / Math.PI) % 360 + 360) % 360, power: pw, sx, sy, intent,
     }
-    c.vx = dx * sp; c.vy = dy * sp
-    const K = 1.25                                   // tip offset (≤0.5R) -> spin
-    c.wy = sy * K * (c.vx / BR); c.wx = -sy * K * (c.vy / BR)   // follow(+)/draw(-)
-    c.wz = sx * K * (sp / BR)                                   // side English
+    c.vx = vx; c.vy = vy; c.wx = wx; c.wy = wy; c.wz = wz
     this.shotCtx = {
       firstHit: null, railAfter: false, potted: [], cuePotted: false,
       group: this.players[this.current].group,
@@ -253,7 +248,7 @@ export class GameEngine {
         cue: { x: this.cue().x, y: this.cue().y }, balls: this.balls,
         history: formatHistory(this.memory, this.current, this.gameId),
       }
-      const mv = await getMove(model, key, buildPrompt(snap))
+      const { move: mv } = await getMove(model, key, buildPrompt(snap))
       this.addLog(`${this.players[this.current].name} (${model}): ${mv.reasoning || game.noReasoning}`, 'you')
       this.addLog(game.shotParams(
         (+mv.angle_degrees || 0).toFixed(0),

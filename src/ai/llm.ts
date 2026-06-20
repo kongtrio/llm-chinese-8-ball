@@ -62,11 +62,14 @@ export function buildPrompt(s: Snapshot): string {
   return o.join('\n')
 }
 
-export async function getMove(model: string, key: string, prompt: string): Promise<Move> {
+export interface Usage { inputTokens: number; outputTokens: number }
+export interface MoveResult { move: Move; usage: Usage }
+
+export async function getMove(model: string, key: string, prompt: string): Promise<MoveResult> {
   return provider(model) === 'anthropic' ? callClaude(model, key, prompt) : callOpenAI(model, key, prompt)
 }
 
-async function callClaude(model: string, key: string, prompt: string): Promise<Move> {
+async function callClaude(model: string, key: string, prompt: string): Promise<MoveResult> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -83,19 +86,48 @@ async function callClaude(model: string, key: string, prompt: string): Promise<M
   if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`)
   const tu = (data.content || []).find((b: any) => b.type === 'tool_use')
   if (!tu) throw new Error('no tool_use in response')
-  return tu.input as Move
+  return { move: tu.input as Move, usage: { inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 } }
 }
 
-async function callOpenAI(model: string, key: string, prompt: string): Promise<Move> {
-  const reasoning = /^(gpt-5|o\d)/.test(model)   // reasoning models burn time/tokens "thinking"
+// gpt-5* and o-series are reasoning models: function tools + reasoning_effort are rejected on
+// /v1/chat/completions ("please use /v1/responses"), so route them through the Responses API.
+const isReasoning = (model: string) => /^(gpt-5|o\d)/.test(model)
+
+async function callOpenAI(model: string, key: string, prompt: string): Promise<MoveResult> {
+  return isReasoning(model) ? callResponses(model, key, prompt) : callChat(model, key, prompt)
+}
+
+async function callResponses(model: string, key: string, prompt: string): Promise<MoveResult> {
+  const res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
+    body: JSON.stringify({
+      model,
+      input: prompt,
+      tools: [{ type: 'function', name: TOOL.name, description: TOOL.description, parameters: TOOL.input_schema }],
+      tool_choice: { type: 'function', name: 'shoot' },
+      reasoning: { effort: 'low' },   // big latency/cost win; no max_output_tokens so it can't truncate
+    }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`)
+  const call = (data.output || []).find((o: any) => o.type === 'function_call')
+  if (!call) {
+    const why = data.status === 'incomplete' ? `incomplete (${data.incomplete_details?.reason})` : `status=${data.status ?? 'unknown'}`
+    throw new Error(`no tool call — ${why}`)
+  }
+  let move: Move
+  try { move = JSON.parse(call.arguments) as Move }
+  catch { throw new Error('tool call arguments were not valid JSON') }
+  return { move, usage: { inputTokens: data.usage?.input_tokens ?? 0, outputTokens: data.usage?.output_tokens ?? 0 } }
+}
+
+async function callChat(model: string, key: string, prompt: string): Promise<MoveResult> {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
     body: JSON.stringify({
       model,
-      // No max_completion_tokens → the model may use its full output budget, so reasoning
-      // can never truncate before it emits the tool call. reasoning_effort keeps it short anyway.
-      ...(reasoning ? { reasoning_effort: 'low' } : {}),   // big latency win on GPT-5 / o-series
       messages: [{ role: 'user', content: prompt }],
       tools: [{ type: 'function', function: { name: TOOL.name, description: TOOL.description, parameters: TOOL.input_schema } }],
       tool_choice: { type: 'function', function: { name: 'shoot' } },
@@ -107,11 +139,13 @@ async function callOpenAI(model: string, key: string, prompt: string): Promise<M
   const call = choice?.message?.tool_calls?.[0]
   if (!call) {
     const why = choice?.finish_reason === 'length'
-      ? 'ran out of tokens before answering (raise max_completion_tokens)'
+      ? 'ran out of tokens before answering'
       : choice?.message?.refusal ? `refused: ${choice.message.refusal}`
         : `finish_reason=${choice?.finish_reason ?? 'unknown'}`
     throw new Error(`no tool call — ${why}`)
   }
-  try { return JSON.parse(call.function.arguments) as Move }
+  let move: Move
+  try { move = JSON.parse(call.function.arguments) as Move }
   catch { throw new Error('tool call arguments were not valid JSON') }
+  return { move, usage: { inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 } }
 }
