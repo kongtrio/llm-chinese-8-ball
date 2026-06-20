@@ -4,6 +4,7 @@ import { CANVAS_W, CANVAS_H, colorOf, isStripe } from '../game/constants'
 import { groupOf } from '../game/types'
 import type { Ball, Group, PlayerConfig, PlayerType } from '../game/types'
 import { SpinPad } from './SpinPad'
+import { isLanguage, text, type Language } from '../i18n'
 
 function BallChip({ n }: { n: number }) {
   const c = colorOf(n)
@@ -32,7 +33,9 @@ const MODELS: [string, { value: string; label: string }[]][] = [
 
 function useLocal<T>(key: string, init: T): [T, (v: T) => void] {
   const [v, setV] = useState<T>(() => {
-    const s = localStorage.getItem(key); return s == null ? init : (JSON.parse(s) as T)
+    const s = localStorage.getItem(key)
+    if (s == null) return init
+    try { return JSON.parse(s) as T } catch { return init }
   })
   return [v, (nv: T) => { setV(nv); localStorage.setItem(key, JSON.stringify(nv)) }]
 }
@@ -41,6 +44,9 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<GameEngine | null>(null)
   const [, force] = useReducer(x => x + 1, 0)
+  const [language, setLanguage] = useLocal<Language>('pool.language', 'en')
+  const lang = isLanguage(language) ? language : 'en'
+  const t = text[lang].ui
 
   const [players, setPlayers] = useLocal<PlayerConfig[]>('pool.players', [
     { type: 'human', model: 'claude-opus-4-8' },
@@ -54,6 +60,7 @@ export default function App() {
   useEffect(() => {
     const eng = new GameEngine(canvasRef.current!)
     engineRef.current = eng
+    eng.setLanguage(lang)
     if (import.meta.env.DEV) (window as unknown as { engine: GameEngine }).engine = eng
     eng.keys = keys; eng.ui.power = power; eng.ui.spinX = spin.x; eng.ui.spinY = spin.y
     const off = eng.on(force)
@@ -63,6 +70,11 @@ export default function App() {
   }, [])
 
   // push live config into the running engine
+  useEffect(() => {
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
+    document.title = lang === 'zh' ? '中式八球 - 真人 vs LLM' : 'Chinese 8-Ball - Human vs LLM'
+    engineRef.current?.setLanguage(lang)
+  }, [lang])
   useEffect(() => { if (engineRef.current) engineRef.current.keys = keys }, [keys])
   useEffect(() => {
     const e = engineRef.current; if (!e) return
@@ -87,24 +99,34 @@ export default function App() {
       />
       <div id="side">
         <div className="card">
-          <div id="status">{eng?.status}</div>
-          <button onClick={() => engineRef.current?.newGame(players)}>New Game</button>
+          <label>{t.langLabel}</label>
+          <select value={lang} onChange={e => setLanguage(e.target.value as Language)}>
+            <option value="en">{t.english}</option>
+            <option value="zh">{t.chinese}</option>
+          </select>
         </div>
 
         <div className="card">
-          <h3>Your shot</h3>
-          <label>Power {Math.round(power * 100)}%</label>
+          <div id="status">{eng?.status}</div>
+          <button onClick={() => engineRef.current?.newGame(players)}>{t.newGame}</button>
+        </div>
+
+        <div className="card">
+          <h3>{t.yourShot}</h3>
+          <label>{t.power} {Math.round(power * 100)}%</label>
           <input type="range" min={0} max={100} value={Math.round(power * 100)}
             onChange={e => setPower(+e.target.value / 100)} />
           <div className="spinpad">
             <SpinPad x={spin.x} y={spin.y} onChange={(x, y) => setSpin({ x, y })} />
-            <div className="hint">Click the ball for spin:<br />horizontal = side English,<br />vertical = follow / draw.<br />Center = no spin.</div>
+            <div className="hint">
+              {t.spinHelp.map(line => <span key={line}>{line}<br /></span>)}
+            </div>
           </div>
-          <p className="hint">Mouse to aim, click table to shoot. On a foul you get ball-in-hand — click to place the cue ball.</p>
+          <p className="hint">{t.aimHelp}</p>
         </div>
 
         <div className="card">
-          <h3>Players</h3>
+          <h3>{t.players}</h3>
           {players.map((p, i) => {
             const group = eng?.players[i]?.group ?? null
             const remaining = eng && group ? remainingNums(eng.balls, group) : []
@@ -113,13 +135,13 @@ export default function App() {
             return (
               <div key={i} className={'player' + (active ? ' active' : '')}>
                 <label>
-                  {active && <span className="turn">▶ </span>}Player {i + 1}
-                  {active && <span className="turn"> · to play</span>}
-                  {group && <span className="grouptag">{group === 'solid' ? 'Solids' : 'Stripes'}</span>}
+                  {active && <span className="turn">▶ </span>}{t.player(i + 1)}
+                  {active && <span className="turn"> · {t.toPlay}</span>}
+                  {group && <span className="grouptag">{text[lang].game.group(group)}</span>}
                 </label>
                 <div className="prow">
                   <select value={p.type} onChange={e => setPlayer(i, { type: e.target.value as PlayerType })}>
-                    <option value="human">Human</option>
+                    <option value="human">{t.human}</option>
                     <option value="llm">LLM</option>
                   </select>
                   <select value={p.model} onChange={e => setPlayer(i, { model: e.target.value })}>
@@ -133,29 +155,29 @@ export default function App() {
                 {group ? (
                   <div className="balls">
                     {onEight
-                      ? <><BallChip n={8} /><span className="hint">— on the 8-ball</span></>
+                      ? <><BallChip n={8} /><span className="hint">- {t.onEightBall}</span></>
                       : remaining.map(n => <BallChip key={n} n={n} />)}
                   </div>
-                ) : <div className="balls hint">group decided on first pot</div>}
+                ) : <div className="balls hint">{t.groupUndecided}</div>}
               </div>
             )
           })}
-          <p className="hint">Each LLM player uses its own model — pit Claude against GPT. Applies on New Game.</p>
+          <p className="hint">{t.playerHelp}</p>
         </div>
 
         <div className="card">
-          <h3>API keys (stored locally only)</h3>
-          <label>Anthropic key (for Claude)</label>
+          <h3>{t.apiKeys}</h3>
+          <label>{t.anthropicKey}</label>
           <input type="password" placeholder="sk-ant-..." value={keys.anthropic}
             onChange={e => setKeys({ ...keys, anthropic: e.target.value })} />
-          <label>OpenAI key (for GPT)</label>
+          <label>{t.openaiKey}</label>
           <input type="password" placeholder="sk-..." value={keys.openai}
             onChange={e => setKeys({ ...keys, openai: e.target.value })} />
-          <p className="hint">The browser calls each provider directly. Don't host this page publicly with a real key in it.</p>
+          <p className="hint">{t.apiHelp}</p>
         </div>
 
         <div className="card">
-          <h3>Log</h3>
+          <h3>{t.log}</h3>
           <div id="log">
             {eng?.log.map((l, i) => <div key={i} className={l.cls}>{l.text}</div>)}
           </div>

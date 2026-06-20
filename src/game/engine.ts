@@ -5,6 +5,7 @@ import { advance, allStopped } from './physics'
 import { evaluateShot } from './rules'
 import { render, toMetres } from './render'
 import { getMove, buildPrompt, provider } from '../ai/llm'
+import { text, type Language } from '../i18n'
 
 export type Phase = 'aiming' | 'rolling' | 'thinking' | 'ballinhand' | 'gameover'
 export interface LogLine { text: string; cls?: string }
@@ -22,6 +23,7 @@ export class GameEngine {
   status = ''
   log: LogLine[] = []
   keys: Keys = { anthropic: '', openai: '' }
+  language: Language = 'en'
   pointer = { x: L / 2, y: W / 2 }     // metres, for aim
   ui = { power: 0.55, spinX: 0, spinY: 0 }
 
@@ -46,12 +48,27 @@ export class GameEngine {
 
   cue() { return this.balls[0] }
   setPointer(px: number, py: number) { const m = toMetres(px, py); this.pointer.x = m.x; this.pointer.y = m.y }
+  setLanguage(language: Language) {
+    this.language = language
+    this.players = this.players.map((p, i) => ({ ...p, name: text[language].game.player(i + 1) }))
+    this.relocalizeStaticLogs()
+    this.refreshStatus()
+  }
+
+  private relocalizeStaticLogs() {
+    const newGameLines = [text.en.game.newGame, text.zh.game.newGame]
+    this.log = this.log.map(line =>
+      newGameLines.some(newGameLine => newGameLine === line.text)
+        ? { ...line, text: text[this.language].game.newGame }
+        : line)
+  }
 
   newGame(cfgs: PlayerConfig[]) {
+    const game = text[this.language].game
     this.balls = rack()
-    this.players = cfgs.map((c, i) => ({ ...c, group: null, name: `Player ${i + 1}` }))
+    this.players = cfgs.map((c, i) => ({ ...c, group: null, name: game.player(i + 1) }))
     this.current = 0; this.ballInHand = false; this.isBreak = true; this.gameOver = false; this.shotCtx = null
-    this.addLog('New game. Player 1 to break.')
+    this.addLog(game.newGame)
     this.nextTurn()
   }
 
@@ -108,12 +125,13 @@ export class GameEngine {
 
   private resolve() {
     const ctx = this.shotCtx!
-    const r = evaluateShot(this.balls, this.players, this.current, this.isBreak, ctx)
+    const game = text[this.language].game
+    const r = evaluateShot(this.balls, this.players, this.current, this.isBreak, ctx, this.language)
     this.isBreak = false
     this.addLog(r.lines.join(' '))
     if (r.winner !== null) {
       this.gameOver = true; this.phase = 'gameover'
-      this.status = `🏆 ${this.players[r.winner].name} wins!`
+      this.status = game.wins(this.players[r.winner].name)
       this.addLog(this.status, 'win'); this.emit(); return
     }
     if (r.keepTurn) this.ballInHand = false
@@ -132,32 +150,40 @@ export class GameEngine {
   private refreshStatus() {
     if (this.gameOver) return
     const p = this.players[this.current]
-    const g = p.group ? p.group + 's' : (this.isBreak ? 'break' : 'open table')
-    let s = `${p.name} (${p.type}) — ${g}.`
-    if (this.ballInHand) s += ' Ball-in-hand.'
-    if (this.phase === 'thinking') s += ' Thinking…'
+    if (!p) return
+    const game = text[this.language].game
+    const g = p.group ? game.group(p.group) : (this.isBreak ? game.break : game.openTable)
+    let s = `${p.name} (${game.playerType(p.type)}) - ${g}.`
+    if (this.ballInHand) s += ` ${game.ballInHand}`
+    if (this.phase === 'thinking') s += ` ${game.thinking}`
     this.status = s; this.emit()
   }
 
   private async doLLMTurn() {
     if (this.llmBusy) return
     this.llmBusy = true
+    const game = text[this.language].game
     const model = this.players[this.current].model, prov = provider(model)
     const key = (prov === 'anthropic' ? this.keys.anthropic : this.keys.openai).trim()
-    if (!key) { this.addLog(`No ${prov === 'anthropic' ? 'Anthropic' : 'OpenAI'} key — add one or set this player to Human.`, 'err'); this.llmBusy = false; return }
+    if (!key) { this.addLog(game.noKey(prov === 'anthropic' ? 'Anthropic' : 'OpenAI'), 'err'); this.llmBusy = false; return }
     try {
       const snap = {
         group: this.players[this.current].group, isBreak: this.isBreak, ballInHand: this.ballInHand,
         cue: { x: this.cue().x, y: this.cue().y }, balls: this.balls,
       }
       const mv = await getMove(model, key, buildPrompt(snap))
-      this.addLog(`${this.players[this.current].name} (${model}): ${mv.reasoning || '(no reasoning)'}`, 'you')
-      this.addLog(`  angle=${(+mv.angle_degrees || 0).toFixed(0)}° power=${(+mv.power || 0).toFixed(2)} spin=(${(+mv.spin_x || 0).toFixed(1)},${(+mv.spin_y || 0).toFixed(1)})`)
+      this.addLog(`${this.players[this.current].name} (${model}): ${mv.reasoning || game.noReasoning}`, 'you')
+      this.addLog(game.shotParams(
+        (+mv.angle_degrees || 0).toFixed(0),
+        (+mv.power || 0).toFixed(2),
+        (+mv.spin_x || 0).toFixed(1),
+        (+mv.spin_y || 0).toFixed(1),
+      ))
       if (this.ballInHand) this.placeCue(mv.cue_x == null ? undefined : mv.cue_x / 100, mv.cue_y == null ? undefined : mv.cue_y / 100)
       this.llmBusy = false
       setTimeout(() => this.shoot((+mv.angle_degrees || 0) * Math.PI / 180, +mv.power || 0.4, +mv.spin_x || 0, +mv.spin_y || 0), 250)
     } catch (e: any) {
-      this.addLog('LLM error: ' + e.message, 'err'); this.llmBusy = false
+      this.addLog(game.llmError(e.message), 'err'); this.llmBusy = false
       if (this.ballInHand) this.placeCue()
       this.fallbackShot()
     }
@@ -169,7 +195,7 @@ export class GameEngine {
     const t = objectBalls(this.balls).filter(onTable).filter(b => !grp || b.num !== 8 && (grp === 'solid' ? b.num < 8 : b.num > 8))[0]
       || objectBalls(this.balls).filter(onTable)[0]
     const ang = t ? Math.atan2(t.y - c.y, t.x - c.x) : 0
-    this.addLog('Falling back to a straight shot at the nearest legal ball.', 'err')
+    this.addLog(text[this.language].game.fallback, 'err')
     this.shoot(ang, 0.5, 0, 0)
   }
 }

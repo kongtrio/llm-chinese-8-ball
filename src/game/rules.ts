@@ -1,6 +1,7 @@
 import { groupOf } from './types'
 import type { Ball, RuntimePlayer, ShotCtx } from './types'
 import { remainingOf, respot } from './table'
+import { text, type Language } from '../i18n'
 
 export interface ShotResult {
   lines: string[]
@@ -16,9 +17,10 @@ export interface ShotResult {
 // ponytail: simplified vs WPA tournament rules — no called shots, no break-legality
 // (4-to-rail), open-table split assigns by first potted ball. Enough for casual play.
 export function evaluateShot(
-  balls: Ball[], players: RuntimePlayer[], currentPlayer: number, isBreak: boolean, ctx: ShotCtx,
+  balls: Ball[], players: RuntimePlayer[], currentPlayer: number, isBreak: boolean, ctx: ShotCtx, lang: Language = 'en',
 ): ShotResult {
   const sp = players[currentPlayer], opp = players[1 - currentPlayer]
+  const game = text[lang].game
   const lines: string[] = []
   let foul = false
   const openTable = !sp.group && !opp.group
@@ -28,32 +30,32 @@ export function evaluateShot(
     if (firstPot) {
       const g = groupOf(firstPot)
       sp.group = g; opp.group = g === 'solid' ? 'stripe' : 'solid'
-      lines.push(`${sp.name} is ${g}s.`)
+      lines.push(game.groupAssigned(sp.name, g))
     }
   }
 
-  if (ctx.cuePotted) { foul = true; lines.push('Scratch (cue pocketed).') }
-  if (ctx.firstHit === null) { foul = true; lines.push('No ball contacted.') }
+  if (ctx.cuePotted) { foul = true; lines.push(game.scratch) }
+  if (ctx.firstHit === null) { foul = true; lines.push(game.noContact) }
   else if (!isBreak) {
     if (openTable && !sp.group) {
-      if (ctx.firstHit === 8) { foul = true; lines.push('Hit the 8 on an open table.') }
+      if (ctx.firstHit === 8) { foul = true; lines.push(game.hitEightOpen) }
     } else if (sp.group) {
       const onEight = ctx.clearedBefore
-      if (onEight && ctx.firstHit !== 8) { foul = true; lines.push('Must hit the 8 first.') }
-      if (!onEight && ctx.firstHit === 8) { foul = true; lines.push('Hit the 8 too early.') }
-      if (!onEight && groupOf(ctx.firstHit) !== sp.group) { foul = true; lines.push('Hit the wrong group first.') }
+      if (onEight && ctx.firstHit !== 8) { foul = true; lines.push(game.mustHitEight) }
+      if (!onEight && ctx.firstHit === 8) { foul = true; lines.push(game.hitEightEarly) }
+      if (!onEight && groupOf(ctx.firstHit) !== sp.group) { foul = true; lines.push(game.wrongGroup) }
     }
   }
   if (!ctx.cuePotted && ctx.firstHit !== null && ctx.potted.length === 0 && !ctx.railAfter) {
-    foul = true; lines.push('No rail after contact.')
+    foul = true; lines.push(game.noRail)
   }
 
   if (ctx.potted.includes(8)) {
-    if (isBreak) { respot(balls, 8); lines.push('8 on the break — respotted.') }
+    if (isBreak) { respot(balls, 8); lines.push(game.eightBreak) }
     else {
       const clearedNow = sp.group && remainingOf(balls, sp.group) === 0
       const win = !!(sp.group && ctx.clearedBefore && clearedNow && !foul && !ctx.cuePotted)
-      lines.push(win ? 'Potted the 8 legally.' : 'Lost on the 8.')
+      lines.push(win ? game.legalEight : game.lostEight)
       return { lines, winner: win ? currentPlayer : 1 - currentPlayer, keepTurn: false, ballInHand: false }
     }
   }
@@ -62,13 +64,13 @@ export function evaluateShot(
     ? ctx.potted.filter(n => groupOf(n) === sp.group).length
     : ctx.potted.filter(n => n !== 8).length
   const named = ctx.potted.filter(n => n !== 8)
-  if (named.length) lines.push('Potted ' + named.join(', ') + '.')
+  if (named.length) lines.push(game.potted(named))
 
   const keepTurn = !foul && pottedMine > 0
-  if (keepTurn) lines.push(`${sp.name} continues.`)
+  if (keepTurn) lines.push(game.continues(sp.name))
   else {
-    if (foul) lines.push(`Foul — ${opp.name} has ball-in-hand.`)
-    lines.push(`${opp.name}'s turn.`)
+    if (foul) lines.push(game.foul(opp.name))
+    lines.push(game.turn(opp.name))
   }
   return { lines, winner: null, keepTurn, ballInHand: foul || ctx.cuePotted }
 }
