@@ -26,4 +26,15 @@ describe('physics', () => {
     for (let i = 0; i < 9000; i++) integrate(e, DT)   // ~15 s; stops near 12.8 s
     expect(Math.hypot(e.vx, e.vy)).toBeLessThan(V_STOP)
   })
+
+  it('updates visual orientation from follow, draw, and side spin', () => {
+    const c = mkBall(0, 1, 0.5)
+    c.wx = 12
+    c.wy = 18
+    c.wz = -9
+    integrate(c, DT)
+    expect(c.rx).toBeGreaterThan(0)
+    expect(c.ry).toBeGreaterThan(0)
+    expect(c.rz).toBeGreaterThan(0)
+  })
 })

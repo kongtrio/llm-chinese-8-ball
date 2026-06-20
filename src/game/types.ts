@@ -6,6 +6,7 @@ export interface Ball {
   x: number; y: number        // position (m)
   vx: number; vy: number      // linear velocity (m/s)
   wx: number; wy: number; wz: number  // angular velocity (rad/s); wz = vertical (side English)
+  rx: number; ry: number; rz: number  // visual orientation (rad)
   potted: boolean
 }
 
@@ -33,4 +34,4 @@ export interface Move {
 }
 
 export const mkBall = (num: number, x: number, y: number): Ball =>
-  ({ num, x, y, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, potted: false })
+  ({ num, x, y, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, rx: 0, ry: 0, rz: 0, potted: false })

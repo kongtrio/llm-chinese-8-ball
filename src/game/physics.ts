@@ -5,6 +5,8 @@ import {
 import type { Ball, ShotCtx } from './types'
 
 const onTable = (b: Ball) => !b.potted
+const TAU = Math.PI * 2
+const wrap = (r: number) => ((r % TAU) + TAU) % TAU
 
 // contact-point (bottom of ball) velocity — drives the friction model
 const slip = (b: Ball) => ({ x: b.vx - BR * b.wy, y: b.vy + BR * b.wx })
@@ -23,6 +25,9 @@ export function integrate(b: Ball, dt: number) {
   }
   b.wz *= Math.exp(-dt / TAU_SPIN)          // spinning (vertical) friction
   b.x += b.vx * dt; b.y += b.vy * dt
+  b.rx = wrap(b.rx + b.wx * dt)
+  b.ry = wrap(b.ry + b.wy * dt)
+  b.rz = wrap(b.rz + b.wz * dt)
   const sl = slip(b)
   if (Math.hypot(b.vx, b.vy) < V_STOP && Math.hypot(sl.x, sl.y) < V_STOP && Math.abs(b.wz) < W_STOP)
     b.vx = b.vy = b.wx = b.wy = b.wz = 0

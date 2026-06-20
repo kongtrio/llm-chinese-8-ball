@@ -37,5 +37,5 @@ export function freeSpot(balls: Ball[], x: number, y: number): { x: number; y: n
 export function respot(balls: Ball[], num: number) {
   const b = balls.find(x => x.num === num)!
   const p = freeSpot(balls, L * 0.72, W / 2)
-  b.x = p.x; b.y = p.y; b.vx = b.vy = b.wx = b.wy = b.wz = 0; b.potted = false
+  b.x = p.x; b.y = p.y; b.vx = b.vy = b.wx = b.wy = b.wz = 0; b.rx = b.ry = b.rz = 0; b.potted = false
 }

@@ -1,9 +1,9 @@
-import { L, W, BR, MAX_CUE, TIME_SCALE } from './constants'
+import { L, W, BR, CANVAS_W, CANVAS_H, MAX_CUE, TIME_SCALE } from './constants'
 import type { Ball, PlayerConfig, RuntimePlayer, ShotCtx } from './types'
 import { rack, onTable, objectBalls, remainingOf, freeSpot, spotFree } from './table'
 import { advance, allStopped } from './physics'
 import { evaluateShot } from './rules'
-import { render, toMetres } from './render'
+import { render, toMetres, type PullView } from './render'
 import { getMove, buildPrompt, provider } from '../ai/llm'
 import { text, type Language } from '../i18n'
 
@@ -25,7 +25,8 @@ export class GameEngine {
   keys: Keys = { anthropic: '', openai: '' }
   language: Language = 'en'
   pointer = { x: L / 2, y: W / 2 }     // metres, for aim
-  ui = { power: 0.55, spinX: 0, spinY: 0 }
+  ui = { power: 0, spinX: 0, spinY: 0 }
+  pull: PullView | null = null
 
   private ctx: CanvasRenderingContext2D
   private shotCtx: ShotCtx | null = null
@@ -35,7 +36,12 @@ export class GameEngine {
   private listeners = new Set<() => void>()
 
   constructor(canvas: HTMLCanvasElement) {
+    const dpr = Math.min(window.devicePixelRatio || 1, 3)
+    canvas.width = Math.round(CANVAS_W * dpr)
+    canvas.height = Math.round(CANVAS_H * dpr)
     this.ctx = canvas.getContext('2d')!
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    this.ctx.imageSmoothingEnabled = true
     this.loop = this.loop.bind(this)
   }
 
@@ -47,7 +53,56 @@ export class GameEngine {
   private addLog(text: string, cls?: string) { this.log = [...this.log, { text, cls }]; this.emit() }
 
   cue() { return this.balls[0] }
+  resetAimLine() {
+    const c = this.cue()
+    this.pointer = { x: Math.min(L - BR, c.x + 1), y: c.y }
+  }
   setPointer(px: number, py: number) { const m = toMetres(px, py); this.pointer.x = m.x; this.pointer.y = m.y }
+  aimFromCursor(px: number, py: number) {
+    if (this.phase !== 'aiming' || this.players[this.current]?.type !== 'human') {
+      this.setPointer(px, py)
+      return
+    }
+    const c = this.cue()
+    const p = toMetres(px, py)
+    const dx = c.x - p.x, dy = c.y - p.y
+    const dist = Math.hypot(dx, dy)
+    if (dist < 0.01) this.resetAimLine()
+    else this.pointer = { x: c.x + dx / dist, y: c.y + dy / dist }
+  }
+  beginPull(px: number, py: number) {
+    if (this.gameOver || this.players[this.current]?.type !== 'human') return
+    this.setPointer(px, py)
+    if (this.phase !== 'aiming') return
+    this.updatePull(px, py)
+  }
+  updatePull(px: number, py: number) {
+    this.setPointer(px, py)
+    if (this.phase !== 'aiming' || this.players[this.current]?.type !== 'human') return
+    const c = this.cue()
+    const p = toMetres(px, py)
+    const dx = c.x - p.x, dy = c.y - p.y
+    const dist = Math.hypot(dx, dy)
+    if (dist < 0.01) {
+      this.pull = { active: true, x: p.x, y: p.y, angle: Math.atan2(this.pointer.y - c.y, this.pointer.x - c.x), power: 0 }
+    } else {
+      this.pull = { active: true, x: p.x, y: p.y, angle: Math.atan2(dy, dx), power: Math.min(1, dist / 0.58) }
+      this.pointer = { x: c.x + Math.cos(this.pull.angle), y: c.y + Math.sin(this.pull.angle) }
+    }
+    this.ui.power = this.pull.power
+    this.emit()
+  }
+  endPull() {
+    if (!this.pull?.active || this.phase !== 'aiming' || this.players[this.current]?.type !== 'human') {
+      this.pull = null
+      return
+    }
+    const { angle, power } = this.pull
+    this.pull = null
+    if (power < 0.04) { this.resetAimLine(); this.emit(); return }
+    this.shoot(angle, power, this.ui.spinX, this.ui.spinY)
+  }
+  cancelPull() { this.pull = null; this.resetAimLine(); this.emit() }
   setLanguage(language: Language) {
     this.language = language
     this.players = this.players.map((p, i) => ({ ...p, name: text[language].game.player(i + 1) }))
@@ -66,6 +121,7 @@ export class GameEngine {
   newGame(cfgs: PlayerConfig[]) {
     const game = text[this.language].game
     this.balls = rack()
+    this.resetAimLine()
     this.players = cfgs.map((c, i) => ({ ...c, group: null, name: game.player(i + 1) }))
     this.current = 0; this.ballInHand = false; this.isBreak = true; this.gameOver = false; this.shotCtx = null
     this.addLog(game.newGame)
@@ -75,10 +131,7 @@ export class GameEngine {
   /** Human click on the table: place the cue (ball-in-hand) or take the shot. */
   humanClick() {
     if (this.gameOver || this.players[this.current]?.type !== 'human') return
-    if (this.phase === 'ballinhand') { this.placeCue(this.pointer.x, this.pointer.y); this.phase = 'aiming'; this.refreshStatus(); return }
-    if (this.phase !== 'aiming') return
-    const c = this.cue()
-    this.shoot(Math.atan2(this.pointer.y - c.y, this.pointer.x - c.x), this.ui.power, this.ui.spinX, this.ui.spinY)
+    if (this.phase === 'ballinhand') { this.placeCue(this.pointer.x, this.pointer.y); this.phase = 'aiming'; this.resetAimLine(); this.refreshStatus(); return }
   }
 
   shoot(angle: number, power: number, spinX: number, spinY: number) {
@@ -103,7 +156,7 @@ export class GameEngine {
     if (x == null || y == null || !(x > BR && x < L - BR && y > BR && y < W - BR)) {
       const d = freeSpot(this.balls, L * 0.25, W / 2); x = d.x; y = d.y
     } else if (!spotFree(this.balls, x, y, c)) { const d = freeSpot(this.balls, x, y); x = d.x; y = d.y }
-    c.x = x; c.y = y; c.vx = c.vy = c.wx = c.wy = c.wz = 0; c.potted = false; this.ballInHand = false
+    c.x = x; c.y = y; c.vx = c.vy = c.wx = c.wy = c.wz = 0; c.rx = c.ry = c.rz = 0; c.potted = false; this.ballInHand = false
   }
 
   // --- main loop ---
@@ -116,7 +169,7 @@ export class GameEngine {
     }
     const human = this.players[this.current]?.type === 'human'
     render(this.ctx, {
-      balls: this.balls, pointer: this.pointer,
+      balls: this.balls, pointer: this.pointer, pull: this.pull,
       aiming: human && this.phase === 'aiming',
       placing: human && this.phase === 'ballinhand',
     })
@@ -144,7 +197,11 @@ export class GameEngine {
     if (this.gameOver) return
     const p = this.players[this.current]
     if (p.type === 'llm') { this.phase = 'thinking'; this.refreshStatus(); void this.doLLMTurn() }
-    else { this.phase = this.ballInHand ? 'ballinhand' : 'aiming'; this.refreshStatus() }
+    else {
+      this.phase = this.ballInHand ? 'ballinhand' : 'aiming'
+      if (this.phase === 'aiming') this.resetAimLine()
+      this.refreshStatus()
+    }
   }
 
   private refreshStatus() {
