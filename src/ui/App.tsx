@@ -210,6 +210,10 @@ export default function App() {
           <div id="log">
             {eng?.log.map((l, i) => <div key={i} className={l.cls}>{l.text}</div>)}
           </div>
+          <button style={{ marginTop: 8 }} onClick={() => engineRef.current?.clearMemory()}>
+            {t.clearMemory(eng?.memory.length ?? 0)}
+          </button>
+          <p className="hint">{t.memoryHelp}</p>
         </details>
       </div>
 

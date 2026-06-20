@@ -34,6 +34,8 @@ export const text = {
       openaiKey: 'OpenAI key (for GPT)',
       apiHelp: "The browser calls each provider directly. Don't host this page publicly with a real key in it.",
       log: 'Log',
+      clearMemory: (n: number) => `Clear AI memory (${n} shots)`,
+      memoryHelp: 'AI players see recent shots + outcomes and learn from them. Persists across games.',
     },
     game: {
       player: (n: number) => `Player ${n}`,
@@ -92,6 +94,8 @@ export const text = {
       openaiKey: 'OpenAI 密钥（GPT）',
       apiHelp: '浏览器会直接调用各模型服务。不要把填入真实密钥的页面公开部署。',
       log: '日志',
+      clearMemory: (n: number) => `清除 AI 记忆（${n} 杆）`,
+      memoryHelp: 'AI 玩家会参考最近的击球与结果进行学习，跨局保留。',
     },
     game: {
       player: (n: number) => `玩家 ${n}`,

@@ -5,7 +5,10 @@ import { advance, allStopped } from './physics'
 import { evaluateShot } from './rules'
 import { render, toMetres, type PullView } from './render'
 import { getMove, buildPrompt, provider } from '../ai/llm'
+import { loadMemory, saveMemory, clearMemory as clearMemoryStore, nextGameId, formatHistory, type ShotRecord } from '../ai/memory'
 import { text, type Language } from '../i18n'
+
+type PendingShot = Omit<ShotRecord, 'game' | 'firstHit' | 'potted' | 'cuePotted' | 'foul' | 'cueEnd'>
 
 export type Phase = 'aiming' | 'rolling' | 'thinking' | 'ballinhand' | 'gameover'
 export interface LogLine { text: string; cls?: string }
@@ -22,6 +25,7 @@ export class GameEngine {
   gameOver = false
   status = ''
   log: LogLine[] = []
+  memory: ShotRecord[] = loadMemory()
   keys: Keys = { anthropic: '', openai: '' }
   language: Language = 'en'
   pointer = { x: L / 2, y: W / 2 }     // metres, for aim
@@ -30,6 +34,8 @@ export class GameEngine {
 
   private ctx: CanvasRenderingContext2D
   private shotCtx: ShotCtx | null = null
+  private pending: PendingShot | null = null
+  private gameId = 0
   private llmBusy = false
   private lastTs = 0
   private raf = 0
@@ -53,6 +59,7 @@ export class GameEngine {
   private addLog(text: string, cls?: string) { this.log = [...this.log, { text, cls }]; this.emit() }
 
   cue() { return this.balls[0] }
+  clearMemory() { this.memory = []; clearMemoryStore(); this.emit() }
   resetAimLine() {
     const c = this.cue()
     this.pointer = { x: Math.min(L - BR, c.x + 1), y: c.y }
@@ -124,6 +131,7 @@ export class GameEngine {
     this.resetAimLine()
     this.players = cfgs.map((c, i) => ({ ...c, group: null, name: game.player(i + 1) }))
     this.current = 0; this.ballInHand = false; this.isBreak = true; this.gameOver = false; this.shotCtx = null
+    this.gameId = nextGameId()       // memory persists across games; tag records by game
     this.addLog(game.newGame)
     this.nextTurn()
   }
@@ -134,11 +142,18 @@ export class GameEngine {
     if (this.phase === 'ballinhand') { this.placeCue(this.pointer.x, this.pointer.y); this.phase = 'aiming'; this.resetAimLine(); this.refreshStatus(); return }
   }
 
-  shoot(angle: number, power: number, spinX: number, spinY: number) {
+  shoot(angle: number, power: number, spinX: number, spinY: number, intent?: string) {
     const c = this.cue()
-    const sp = Math.max(0, Math.min(1, power)) * MAX_CUE
+    const pw = Math.max(0, Math.min(1, power))
+    const sp = pw * MAX_CUE
     let sx = spinX || 0, sy = spinY || 0; const m = Math.hypot(sx, sy); if (m > 1) { sx /= m; sy /= m }  // no miscue
     const dx = Math.cos(angle), dy = Math.sin(angle)
+    const p = this.players[this.current]
+    this.pending = {                                 // captured now; completed with the outcome in resolve()
+      player: this.current, who: p.name, model: p.type === 'llm' ? p.model : null,
+      group: p.group as 'solid' | 'stripe' | null, cue: { x: Math.round(c.x * 100), y: Math.round(c.y * 100) },
+      aim: ((angle * 180 / Math.PI) % 360 + 360) % 360, power: pw, sx, sy, intent,
+    }
     c.vx = dx * sp; c.vy = dy * sp
     const K = 1.25                                   // tip offset (≤0.5R) -> spin
     c.wy = sy * K * (c.vx / BR); c.wx = -sy * K * (c.vy / BR)   // follow(+)/draw(-)
@@ -182,6 +197,15 @@ export class GameEngine {
     const r = evaluateShot(this.balls, this.players, this.current, this.isBreak, ctx, this.language)
     this.isBreak = false
     this.addLog(r.lines.join(' '))
+    if (this.pending) {                              // complete the shot record with its outcome
+      const cb = this.cue()
+      this.memory = [...this.memory, {
+        ...this.pending, game: this.gameId,
+        firstHit: ctx.firstHit, potted: [...ctx.potted], cuePotted: ctx.cuePotted, foul: r.foul,
+        cueEnd: { x: Math.round(cb.x * 100), y: Math.round(cb.y * 100) },
+      }]
+      saveMemory(this.memory); this.pending = null
+    }
     if (r.winner !== null) {
       this.gameOver = true; this.phase = 'gameover'
       this.status = game.wins(this.players[r.winner].name)
@@ -227,6 +251,7 @@ export class GameEngine {
       const snap = {
         group: this.players[this.current].group, isBreak: this.isBreak, ballInHand: this.ballInHand,
         cue: { x: this.cue().x, y: this.cue().y }, balls: this.balls,
+        history: formatHistory(this.memory, this.current, this.gameId),
       }
       const mv = await getMove(model, key, buildPrompt(snap))
       this.addLog(`${this.players[this.current].name} (${model}): ${mv.reasoning || game.noReasoning}`, 'you')
@@ -238,7 +263,8 @@ export class GameEngine {
       ))
       if (this.ballInHand) this.placeCue(mv.cue_x == null ? undefined : mv.cue_x / 100, mv.cue_y == null ? undefined : mv.cue_y / 100)
       this.llmBusy = false
-      setTimeout(() => this.shoot((+mv.angle_degrees || 0) * Math.PI / 180, +mv.power || 0.4, +mv.spin_x || 0, +mv.spin_y || 0), 250)
+      const intent = mv.reasoning?.slice(0, 80)
+      setTimeout(() => this.shoot((+mv.angle_degrees || 0) * Math.PI / 180, +mv.power || 0.4, +mv.spin_x || 0, +mv.spin_y || 0, intent), 250)
     } catch (e: any) {
       this.addLog(game.llmError(e.message), 'err'); this.llmBusy = false
       if (this.ballInHand) this.placeCue()

@@ -8,6 +8,7 @@ export interface ShotResult {
   winner: number | null       // player index, or null if game continues
   keepTurn: boolean
   ballInHand: boolean
+  foul: boolean
 }
 
 // Standard 8-ball, evaluated after all balls have stopped. Mutates players[].group
@@ -56,7 +57,7 @@ export function evaluateShot(
       const clearedNow = sp.group && remainingOf(balls, sp.group) === 0
       const win = !!(sp.group && ctx.clearedBefore && clearedNow && !foul && !ctx.cuePotted)
       lines.push(win ? game.legalEight : game.lostEight)
-      return { lines, winner: win ? currentPlayer : 1 - currentPlayer, keepTurn: false, ballInHand: false }
+      return { lines, winner: win ? currentPlayer : 1 - currentPlayer, keepTurn: false, ballInHand: false, foul }
     }
   }
 
@@ -72,5 +73,5 @@ export function evaluateShot(
     if (foul) lines.push(game.foul(opp.name))
     lines.push(game.turn(opp.name))
   }
-  return { lines, winner: null, keepTurn, ballInHand: foul || ctx.cuePotted }
+  return { lines, winner: null, keepTurn, ballInHand: foul || ctx.cuePotted, foul }
 }
