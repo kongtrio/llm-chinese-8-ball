@@ -1,4 +1,5 @@
 import type { ShotRecord } from '../ai/memory'
+import type { ReasoningEffort } from '../ai/llm'
 import type { Language } from '../i18n'
 
 export interface Keys { anthropic: string; openai: string }
@@ -6,8 +7,9 @@ export interface Keys { anthropic: string; openai: string }
 export interface GameOptions {
   maxShots?: number          // hard cap on shots before a game is declared a stalemate (default 240)
   maxSubsteps?: number       // physics substep cap per shot before voiding the game (default 6000 = 10s game-time)
-  perCallTimeoutMs?: number  // per-LLM-call timeout (default 90000; reasoning models are slow)
+  perCallTimeoutMs?: number  // per-LLM-call timeout (default 180000; medium/high reasoning routinely takes 60–90s+)
   maxRetries?: number        // retries on 429/5xx/timeout (default 3)
+  reasoningEffort?: ReasoningEffort  // OpenAI reasoning models (gpt-5*/o*); default 'low'
   lang?: Language            // language for evaluateShot log lines (default 'en')
   history?: boolean          // feed prior-shot history into the prompt (in-context learning; default false)
   verbose?: boolean          // print per-shot log lines (default false)

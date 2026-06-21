@@ -13,7 +13,7 @@ const retryable = (msg: string) =>
 export async function callLLMWithRetry(model: string, key: string, prompt: string, opts: GameOptions = {}): Promise<MoveResult> {
   if (!key?.trim()) throw new Error('missing api key')           // never retry, never burn quota
   const maxRetries = opts.maxRetries ?? 3
-  const timeoutMs = opts.perCallTimeoutMs ?? 90_000
+  const timeoutMs = opts.perCallTimeoutMs ?? 180_000   // reasoning models at medium/high routinely take 60–90s+
   let lastErr: unknown
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let handle: ReturnType<typeof setTimeout> | undefined
@@ -21,7 +21,7 @@ export async function callLLMWithRetry(model: string, key: string, prompt: strin
       // explicit timeout Promise raced against getMove — getMove's fetch is left to settle and GC,
       // we just stop awaiting it. clearTimeout in finally so timers don't pile up at high concurrency.
       const timeout = new Promise<never>((_, rej) => { handle = setTimeout(() => rej(new Error('timeout')), timeoutMs) })
-      return await Promise.race([getMove(model, key, prompt), timeout])
+      return await Promise.race([getMove(model, key, prompt, opts.reasoningEffort), timeout])
     } catch (e) {
       lastErr = e
       const msg = e instanceof Error ? e.message : String(e)

@@ -23,12 +23,14 @@ if (!args.models || args.models === true) {
   console.error(`Usage: npm run bench -- --models <id1,id2,...> [options]
 
   --models        comma-separated model IDs, e.g. claude-opus-4-8,gpt-5  (required)
-  --games N       games per pair (default 1; use >=20 for a real ranking)
-  --concurrency N max games in flight (default 3)
-  --out PATH      JSON report path (.md written alongside; default ./bench-results/run-<ISO>.json)
-  --history       feed prior-shot history into prompts (in-context learning; default off)
-  --self-play     also pair each model against itself (baseline; default off)
-  --verbose       print per-shot log lines
+  --games N            games per pair (default 1; use >=20 for a real ranking)
+  --concurrency N      max games in flight (default 3)
+  --max-shots N        cap shots/game before it's a draw (default 240)
+  --reasoning-effort E low | medium | high for gpt-5*/o* models (default low)
+  --out PATH           JSON report path (.md written alongside; default ./bench-results/run-<ISO>.json)
+  --history            feed prior-shot history into prompts (in-context learning; default off)
+  --self-play          also pair each model against itself (baseline; default off)
+  --verbose            print per-shot log lines
 
 API keys come from the environment ONLY (never CLI args):
   ANTHROPIC_API_KEY   for claude* models
@@ -58,9 +60,17 @@ if (missing.size) {
 const games = args.games ? Math.max(1, parseInt(String(args.games), 10) || 1) : 1
 if (games < 20) console.warn(`⚠  --games ${games}: this is a smoke run. Use >=20 games/pair for a meaningful ranking.\n`)
 
+const effortArg = typeof args['reasoning-effort'] === 'string' ? args['reasoning-effort'] : 'low'
+if (!['low', 'medium', 'high'].includes(effortArg)) {
+  console.error(`Invalid --reasoning-effort "${effortArg}" (use low | medium | high)`)
+  process.exit(1)
+}
+
 await runBenchmark(models, keys, {
   gamesPerPair: games,
   concurrency: args.concurrency ? Math.max(1, parseInt(String(args.concurrency), 10) || 3) : 3,
+  maxShots: args['max-shots'] ? Math.max(1, parseInt(String(args['max-shots']), 10) || 240) : undefined,
+  reasoningEffort: effortArg as 'low' | 'medium' | 'high',
   out: typeof args.out === 'string' ? args.out : undefined,
   history: !!args.history,
   selfPlay: !!args['self-play'],

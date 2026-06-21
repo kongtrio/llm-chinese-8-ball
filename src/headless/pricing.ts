@@ -4,11 +4,13 @@
 export interface Price { in: number; out: number }   // reasoning tokens bill at the output rate
 
 export const PRICES: Record<string, Price> = {
-  'gpt-5.5': { in: 5.0, out: 30.0 },
+  'gpt-5': { in: 1.25, out: 10.0 },
+  'gpt-5.1': { in: 1.25, out: 10.0 },
+  'gpt-5.2': { in: 1.75, out: 14.0 },
+  'gpt-5.4': { in: 2.5, out: 15.0 },
   'gpt-5.4-nano': { in: 0.2, out: 1.25 },
-  // add more here as you benchmark them, e.g.:
-  // 'gpt-5.4': { in: ?, out: ? },
-  // 'claude-opus-4-8': { in: ?, out: ? },
+  'gpt-5.5': { in: 5.0, out: 30.0 },
+  // add more here as you benchmark them, e.g. 'claude-opus-4-8': { in: ?, out: ? },
 }
 
 /** Cost in USD for the given token counts, or null if the model has no price entry. */

@@ -35,38 +35,54 @@ export interface Snapshot {
 export function buildPrompt(s: Snapshot): string {
   const cm = (v: number) => Math.round(v * 100)
   const o: string[] = []
-  o.push('You are a world-class 8-ball pool player. It is your turn — play like a pro: take the high-percentage shot, control the cue ball for the next one, and plan the whole run-out.')
-  o.push(`Table play area is ${cm(L)}x${cm(W)} cm. Origin top-left, +x right, +y DOWN. Ball radius ${cm(BR)} cm (diameter ${(BR * 200).toFixed(1)} cm).`)
-  o.push('Pockets (x,y cm): ' + POCKETS.map(p => `(${cm(p.x)},${cm(p.y)})`).join(' ') + '. Pockets are tight.')
-  o.push('Your group: ' + (s.group ? s.group + 's' : (s.isBreak ? 'BREAK — table open' : 'OPEN TABLE — first ball you legally pot sets your group')))
-  if (s.isBreak) o.push('THIS IS THE BREAK — smash the rack. Aim straight at the apex (front) ball, i.e. the rack ball nearest the cue, and hit it near full power (power 0.92–1.0) to explode the pack and pot balls. Add a little draw or stun (spin_y about -0.2 to 0) so the cue stays near mid-table and does not scratch or fly off. A hard, square, controlled break is the goal — do not play it soft.')
-  if (s.group) o.push(`Pot all your ${s.group}s, then the 8 to win. Potting the 8 early or scratching on it loses.`)
-  o.push(s.ballInHand ? 'BALL-IN-HAND: place the cue anywhere via cue_x, cue_y (cm).' : `Cue ball at (${cm(s.cue.x)}, ${cm(s.cue.y)}) cm.`)
+  const dia = (BR * 200).toFixed(1)
+  o.push('You are a world-class Chinese 8-ball player. Play the highest-percentage shot, control the cue ball for your next shot, plan the whole run-out — and above all, DO NOT FOUL.')
+  o.push(`Table play area ${cm(L)}x${cm(W)} cm. Origin top-left, +x = right, +y = DOWN, so angle_degrees is clockwise (0=right, 90=down, 180=left, 270=up). Ball diameter ${dia} cm.`)
+  o.push('Pockets (x,y cm): ' + POCKETS.map(p => `(${cm(p.x)},${cm(p.y)})`).join(' ') + '. Pockets are TIGHT — aim precisely.')
+  o.push('Your group: ' + (s.group ? `${s.group}s (solids = 1-7, stripes = 9-15; the 8-ball is neither)` : (s.isBreak ? 'BREAK — table open' : 'OPEN TABLE — the first ball you legally pot sets your group')))
+  if (s.group) o.push(`Win by potting all your ${s.group}s, THEN legally potting the 8. Potting the 8 before your group is cleared, or fouling as you pot it, LOSES the game.`)
+  o.push(s.ballInHand ? 'You have BALL-IN-HAND: place the cue anywhere via cue_x, cue_y (cm) — put it where you have the easiest, straightest pot.' : `Cue ball at (${cm(s.cue.x)}, ${cm(s.cue.y)}) cm.`)
   o.push('Balls on table:')
   for (const b of s.balls) if (b.num !== 0 && !b.potted)
     o.push(`  ${b.num} (${groupOf(b.num) === 'eight' ? '8-ball' : groupOf(b.num)}) at (${cm(b.x)}, ${cm(b.y)})`)
-  o.push('Rules: cue must contact one of your balls first (any ball on open/break, but not the 8 first unless it is all you have left); after contact a ball must be pocketed or reach a cushion, else foul.')
-  o.push([
-    'How to choose your shot — reason about the WHOLE table before deciding, not just one ball:',
-    '1. Consider EVERY one of your balls, not just the nearest. For each candidate check two straight lines against the coordinates of ALL other balls:',
-    '   - cue → target ball: must be clear (no other ball within ~6 cm of the line), or you will hit the wrong ball first and foul;',
-    '   - target ball → chosen pocket: must be clear, or the object ball cannot reach the pocket.',
-    '   Reject any shot whose path is blocked, and prefer shorter, straighter, more open shots.',
-    '2. POSITION PLAY: the cue ball keeps rolling after contact — plan where it stops. Choose power and spin to leave the cue with an easy, open shot on your NEXT ball. follow (spin_y>0) sends it forward along the shot line, draw (spin_y<0) pulls it back, stun (spin_y≈0) stops it near the contact point; softer power = less cue travel. Never aim the cue toward a pocket after contact (scratch).',
-    '3. THINK AHEAD 2–3 balls: pick the order of your balls so each pot leaves a good angle on the next, and so the last ones are near pockets. Prefer an easy run-out over one spectacular shot that wrecks position.',
-    '4. If no pot is makeable, play SAFE: roll gently to leave the cue where the opponent has no open shot (tuck it behind your balls or the 8), rather than forcing a low-percentage pot that risks selling out or fouling.',
-    '5. On the 8-ball, choose the pocket you can reach with both lines clear AND a controlled cue finish.',
-  ].join('\n'))
+
+  if (s.isBreak) {
+    o.push('THIS IS THE BREAK — aim straight at the apex (front) rack ball nearest the cue and hit near full power (0.92–1.0) to scatter the pack. Add a little draw/stun (spin_y −0.2..0) so the cue stays mid-table and does not scratch. Do not play it soft.')
+  } else {
+    o.push([
+      'LEGAL SHOT — the cue ball must FIRST touch a legal ball:',
+      ' • open table: any ball except the 8;   • once you have a group: one of YOUR balls;   • the 8 only after your whole group is potted.',
+      'THEN a ball must be POTTED, or — if nothing is potted — at least one ball must reach a CUSHION after contact (the "rail rule"). Otherwise it is a FOUL and your opponent gets ball-in-hand anywhere. Scratching the cue ball, or touching the 8 / wrong group first, are also fouls. (Avoiding fouls is the biggest thing separating good play from bad here.)',
+      '',
+      'AIMING (ghost-ball) — to send target T into pocket K (coordinates in cm):',
+      ' 1. u = (K − T) / |K − T|            // unit vector from the target toward the pocket',
+      ` 2. G = T − ${dia} · u                // "ghost" cue position: one ball-diameter behind T, away from K`,
+      ' 3. angle_degrees = degrees(atan2(Gy − Cy, Gx − Cx))   // aim the cue (at C) straight at G',
+      ' Cut angle = angle between line C→T and line T→K: under ~30° is easy, ~50°+ is low-percentage — prefer a different ball or a safety.',
+      '',
+      'CLEARANCE — reject the shot unless BOTH straight lines are clear of every other ball (a ball within one ball-diameter of a line blocks it):',
+      ' • cue → G  (else you contact the wrong ball first = foul);   • T → K  (else the target cannot reach the pocket).',
+      '',
+      'CUE-BALL CONTROL — predict where the cue goes after contact, to avoid scratching it AND to get shape on your next ball:',
+      ' • stun (spin_y ≈ 0): cue leaves at ~90° to the target’s direction (the tangent line);',
+      ' • follow (spin_y > 0): cue carries forward, bending ~30° off its line on medium cuts;',
+      ' • draw (spin_y < 0): cue comes back to the opposite side (~3× the cut angle on shallow cuts).',
+      ' Less power = less cue travel. NEVER leave the cue rolling toward a pocket. Choose power+spin so the cue stops with an open shot on your next ball.',
+      '',
+      'PLAN — consider EVERY one of your balls (not just the nearest); order them so each pot leaves an easy angle on the next, saving balls near pockets for last. If NO pot is makeable, play a SAFETY: roll the cue safe behind your balls or the 8 — but you MUST still drive some ball to a cushion after contact (do not just nudge your ball into place), or the rail rule makes it a foul.',
+    ].join('\n'))
+  }
   if (s.history) o.push('\n' + s.history)
-  o.push('\nAim mechanics: angle_degrees points from the cue ball toward the target — use the ghost-ball line so the cue centre arrives one ball-diameter from the target centre, along the line from the target to your chosen pocket. Decide the full plan, then call the "shoot" tool.')
+  o.push('\nFINAL CHECK before you answer: (1) does the cue hit a LEGAL ball first? (2) will a ball be potted OR reach a rail after contact? (3) does the cue avoid rolling into every pocket (no scratch)? If any answer is "no", change the shot. Put your plan in `reasoning`, then call the "shoot" tool.')
   return o.join('\n')
 }
 
+export type ReasoningEffort = 'low' | 'medium' | 'high'
 export interface Usage { inputTokens: number; outputTokens: number }
 export interface MoveResult { move: Move; usage: Usage }
 
-export async function getMove(model: string, key: string, prompt: string): Promise<MoveResult> {
-  return provider(model) === 'anthropic' ? callClaude(model, key, prompt) : callOpenAI(model, key, prompt)
+export async function getMove(model: string, key: string, prompt: string, effort: ReasoningEffort = 'low'): Promise<MoveResult> {
+  return provider(model) === 'anthropic' ? callClaude(model, key, prompt) : callOpenAI(model, key, prompt, effort)
 }
 
 async function callClaude(model: string, key: string, prompt: string): Promise<MoveResult> {
@@ -93,11 +109,11 @@ async function callClaude(model: string, key: string, prompt: string): Promise<M
 // /v1/chat/completions ("please use /v1/responses"), so route them through the Responses API.
 const isReasoning = (model: string) => /^(gpt-5|o\d)/.test(model)
 
-async function callOpenAI(model: string, key: string, prompt: string): Promise<MoveResult> {
-  return isReasoning(model) ? callResponses(model, key, prompt) : callChat(model, key, prompt)
+async function callOpenAI(model: string, key: string, prompt: string, effort: ReasoningEffort): Promise<MoveResult> {
+  return isReasoning(model) ? callResponses(model, key, prompt, effort) : callChat(model, key, prompt)
 }
 
-async function callResponses(model: string, key: string, prompt: string): Promise<MoveResult> {
+async function callResponses(model: string, key: string, prompt: string, effort: ReasoningEffort): Promise<MoveResult> {
   const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
@@ -106,7 +122,7 @@ async function callResponses(model: string, key: string, prompt: string): Promis
       input: prompt,
       tools: [{ type: 'function', name: TOOL.name, description: TOOL.description, parameters: TOOL.input_schema }],
       tool_choice: { type: 'function', name: 'shoot' },
-      reasoning: { effort: 'low' },   // big latency/cost win; no max_output_tokens so it can't truncate
+      reasoning: { effort },   // higher effort = more reasoning tokens (output-billed) + latency; no max_output_tokens so it can't truncate
     }),
   })
   const data = await res.json()

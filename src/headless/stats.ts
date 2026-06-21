@@ -19,6 +19,7 @@ const percentile = (xs: number[], q: number) => {
 
 export interface ModelAgg {
   model: string
+  points: number          // 3·win + 1·draw (stalemate) + 0·loss; voids award nothing — primary ranking
   games: number; wins: number; losses: number; stalemates: number; voids: number
   poolSkillPct: number; wilsonLo: number; wilsonHi: number
   reliabilityPct: number; foulRate: number; apiErrorRate: number
@@ -33,6 +34,7 @@ export interface BenchmarkReport {
   meta: {
     timestamp: string; models: string[]; gamesPerPair: number; concurrency: number
     historyEnabled: boolean; nodeVersion: string; totalGames: number
+    reasoningEffort: string; maxShots: number   // settings that affect skill/cost, recorded for reproducibility
     totalCostUsd: number | null   // sum of priced models; null if no model had a price
     unpricedModels: string[]      // models excluded from totalCostUsd (no price entry)
   }
@@ -72,6 +74,7 @@ export function aggregate(games: GameResult[], models: string[]): ModelAgg[] {
     const w = wilson(a.wins, decisive)
     return {
       model,
+      points: a.wins * 3 + a.stalemates,   // 3 win / 1 draw / 0 loss; voids contribute nothing
       games: a.games, wins: a.wins, losses: a.losses, stalemates: a.stalemates, voids: a.voids,
       poolSkillPct: pct(a.wins, decisive), wilsonLo: w.lo, wilsonHi: w.hi,
       // of the moves the model actually returned, the fraction that were well-formed.
@@ -83,7 +86,7 @@ export function aggregate(games: GameResult[], models: string[]): ModelAgg[] {
       p50: percentile(a.lat, 0.5), p95: percentile(a.lat, 0.95),
       inputTokens: a.inTok, outputTokens: a.outTok, costUsd: costUsd(model, a.inTok, a.outTok),
     }
-  }).sort((x, y) => y.poolSkillPct - x.poolSkillPct || y.wins - x.wins)
+  }).sort((x, y) => y.points - x.points || y.wins - x.wins || y.poolSkillPct - x.poolSkillPct)
 }
 
 /** Total $ across models that have a price; lists the ones skipped for lack of one. */
@@ -114,16 +117,16 @@ const ktok = (n: number) => `${Math.round(n / 1000)}k`
 export function renderMarkdown(r: BenchmarkReport): string {
   const o: string[] = []
   o.push(`# LLM Chinese 8-Ball Benchmark`)
-  o.push(`\n_${r.meta.timestamp} · ${r.meta.totalGames} games · ${r.meta.gamesPerPair}/pair · concurrency ${r.meta.concurrency} · history ${r.meta.historyEnabled ? 'on' : 'off'} · node ${r.meta.nodeVersion}_\n`)
+  o.push(`\n_${r.meta.timestamp} · ${r.meta.totalGames} games · ${r.meta.gamesPerPair}/pair · effort ${r.meta.reasoningEffort} · max-shots ${r.meta.maxShots} · concurrency ${r.meta.concurrency} · history ${r.meta.historyEnabled ? 'on' : 'off'} · node ${r.meta.nodeVersion}_\n`)
 
   o.push(`## Leaderboard\n`)
-  o.push(`Ranked by **pool skill** = wins / (wins + losses), excluding stalemates & voids. Reliability = fraction of *returned* moves that were well-formed (API failures excluded — see API err); reported separately so move-formatting ability is not mistaken for pool skill.\n`)
-  o.push(`| # | Model | Skill % | 95% CI | W–L–S | Reliability | Foul/shot | Avg shots/win | API err | p50/p95 ms | Tokens in/out | Cost |`)
-  o.push(`|---|-------|--------:|:------:|:-----:|:-----------:|:---------:|:-------------:|:-------:|:----------:|:-------------:|-----:|`)
+  o.push(`Ranked by **points** (win = 3, draw = 1, loss = 0; draw = stalemate, voids score nothing). Skill % = wins / (wins + losses) with a Wilson 95% CI, shown as a secondary signal. Reliability = fraction of *returned* moves that were well-formed (API failures excluded — see API err), so move-formatting ability is not mistaken for pool skill.\n`)
+  o.push(`| # | Model | Pts | W–D–L | Skill % | 95% CI | Reliability | Foul/shot | Avg shots/win | API err | p50/p95 ms | Tokens in/out | Cost |`)
+  o.push(`|---|-------|----:|:-----:|--------:|:------:|:-----------:|:---------:|:-------------:|:-------:|:----------:|:-------------:|-----:|`)
   r.leaderboard.forEach((m, i) => {
     const ciWidth = m.wilsonHi - m.wilsonLo
     const ci = `${fp(m.wilsonLo, 0)}–${fp(m.wilsonHi, 0)}${ciWidth > 0.30 ? ' ⚠' : ''}`
-    o.push(`| ${i + 1} | ${m.model} | ${fp(m.poolSkillPct)} | ${ci} | ${m.wins}–${m.losses}–${m.stalemates} | ${fp(m.reliabilityPct)}% | ${fp(m.foulRate)}% | ${m.avgShotsPerWin.toFixed(1)} | ${fp(m.apiErrorRate)}% | ${m.p50}/${m.p95} | ${ktok(m.inputTokens)}/${ktok(m.outputTokens)} | ${money(m.costUsd)} |`)
+    o.push(`| ${i + 1} | ${m.model} | **${m.points}** | ${m.wins}–${m.stalemates}–${m.losses} | ${fp(m.poolSkillPct)} | ${ci} | ${fp(m.reliabilityPct)}% | ${fp(m.foulRate)}% | ${m.avgShotsPerWin.toFixed(1)} | ${fp(m.apiErrorRate)}% | ${m.p50}/${m.p95} | ${ktok(m.inputTokens)}/${ktok(m.outputTokens)} | ${money(m.costUsd)} |`)
   })
   const cost = r.meta.totalCostUsd
   o.push(`\n**Total cost: ${money(cost)}**${r.meta.unpricedModels.length ? ` _(excludes ${r.meta.unpricedModels.join(', ')} — no price set in pricing.ts)_` : ''}`)

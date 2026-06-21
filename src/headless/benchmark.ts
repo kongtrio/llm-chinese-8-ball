@@ -69,6 +69,7 @@ export async function runBenchmark(models: string[], keys: Keys, opts: BenchOpti
     meta: {
       timestamp: new Date().toISOString(), models, gamesPerPair, concurrency,
       historyEnabled: !!opts.history, nodeVersion: process.version, totalGames: results.length,
+      reasoningEffort: opts.reasoningEffort ?? 'low', maxShots: opts.maxShots ?? 240,
       totalCostUsd, unpricedModels,
     },
     leaderboard,

@@ -29,7 +29,7 @@ describe('computeShot (shared source of truth)', () => {
     const s = computeShot(0, 5, 1, 1)             // power>1 clamped; spin (1,1) normalized to ~0.707
     expect(s.pw).toBe(1)
     expect(Math.hypot(s.sx, s.sy)).toBeCloseTo(1, 10)
-    expect(s.wz).toBeCloseTo(s.sx * 1.25 * (MAX_CUE / BR), 6)   // side English from sp
+    expect(s.wz).toBeCloseTo(-s.sx * 1.25 * (MAX_CUE / BR), 6)   // side English (negated: y-down convention)
     expect(s.wy).toBeCloseTo(s.sy * 1.25 * (s.vx / BR), 6)      // follow from vx
   })
 })
