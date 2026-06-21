@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" width="1280" height="360" role="img" aria-label="Chinese 8-Ball">
+  <defs>
+    <linearGradient id="rail" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7a4a28"/>
+      <stop offset="0.16" stop-color="#3f2113"/>
+      <stop offset="0.55" stop-color="#5c3219"/>
+      <stop offset="1" stop-color="#26140c"/>
+    </linearGradient>
+    <radialGradient id="felt" cx="0.66" cy="0.4" r="0.85">
+      <stop offset="0" stop-color="#16885c"/>
+      <stop offset="0.45" stop-color="#0c6644"/>
+      <stop offset="1" stop-color="#063629"/>
+    </radialGradient>
+    <radialGradient id="shine" cx="0.35" cy="0.28" r="0.85">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="0.13" stop-color="#ffffff" stop-opacity="0.42"/>
+      <stop offset="0.42" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.78" stop-color="#000000" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.62"/>
+    </radialGradient>
+    <radialGradient id="shadow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.5"/>
+      <stop offset="0.65" stop-color="#000000" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shaft" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#9a6a34"/>
+      <stop offset="0.6" stop-color="#d7ad68"/>
+      <stop offset="1" stop-color="#f3e3bd"/>
+    </linearGradient>
+    <clipPath id="c11"><circle cx="975" cy="268" r="40"/></clipPath>
+  </defs>
+
+  <rect width="1280" height="360" rx="22" fill="url(#rail)"/>
+  <rect x="18" y="18" width="1244" height="324" rx="13" fill="url(#felt)"/>
+  <rect x="18" y="18" width="1244" height="324" rx="13" fill="none" stroke="#000000" stroke-opacity="0.22" stroke-width="2"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="80" y="150" font-size="25" fill="#bfe6d2" fill-opacity="0.72" letter-spacing="11">中式八球</text>
+    <text x="76" y="238" font-size="92" font-weight="800" fill="#fbf8ed" letter-spacing="-1.5">Chinese 8-Ball</text>
+    <g font-size="18" font-weight="500" text-anchor="middle">
+      <rect x="80" y="276" width="170" height="36" rx="18" fill="#000000" fill-opacity="0.2" stroke="#e9f6ee" stroke-opacity="0.34"/>
+      <text x="165" y="300" fill="#eaf6ef">Human vs Human</text>
+      <rect x="262" y="276" width="152" height="36" rx="18" fill="#000000" fill-opacity="0.2" stroke="#e9f6ee" stroke-opacity="0.34"/>
+      <text x="338" y="300" fill="#eaf6ef">Human vs LLM</text>
+      <rect x="426" y="276" width="134" height="36" rx="18" fill="#d8b15a" fill-opacity="0.16" stroke="#d8b15a" stroke-opacity="0.6"/>
+      <text x="493" y="300" fill="#f0dca8">LLM vs LLM</text>
+    </g>
+  </g>
+
+  <g>
+    <ellipse cx="954" cy="222" rx="44" ry="13" fill="url(#shadow)"/>
+    <ellipse cx="1074" cy="188" rx="47" ry="14" fill="url(#shadow)"/>
+    <ellipse cx="979" cy="306" rx="40" ry="12" fill="url(#shadow)"/>
+    <ellipse cx="886" cy="291" rx="44" ry="13" fill="url(#shadow)"/>
+  </g>
+
+  <g stroke-linecap="round">
+    <line x1="1256" y1="336" x2="1118" y2="262" stroke="#1d1109" stroke-width="14"/>
+    <line x1="1256" y1="336" x2="1118" y2="262" stroke="#4a2c14" stroke-width="11"/>
+    <line x1="1124" y1="265" x2="992" y2="194" stroke="url(#shaft)" stroke-width="9"/>
+    <line x1="1006" y1="201" x2="990" y2="193" stroke="#eef0ee" stroke-width="9"/>
+    <circle cx="988" cy="192" r="4.6" fill="#2b6fb0"/>
+  </g>
+
+  <g font-family="-apple-system, Helvetica, Arial, sans-serif" text-anchor="middle">
+    <g>
+      <circle cx="975" cy="268" r="40" fill="#c0392b"/>
+      <rect x="935" y="252" width="80" height="32" fill="#fbf7ed" clip-path="url(#c11)"/>
+      <circle cx="975" cy="268" r="40" fill="url(#shine)"/>
+      <circle cx="975" cy="268" r="14" fill="#fbf8ed"/>
+      <text x="975" y="274" font-size="17" font-weight="700" fill="#1a1a1a">11</text>
+    </g>
+    <g>
+      <circle cx="886" cy="248" r="45" fill="#e8b21e"/>
+      <circle cx="886" cy="248" r="45" fill="url(#shine)"/>
+      <circle cx="886" cy="248" r="16" fill="#fbf8ed"/>
+      <text x="886" y="255" font-size="20" font-weight="700" fill="#1a1a1a">1</text>
+    </g>
+    <g>
+      <circle cx="954" cy="180" r="45" fill="#f4efe1"/>
+      <circle cx="954" cy="180" r="45" fill="url(#shine)"/>
+    </g>
+    <g>
+      <circle cx="1074" cy="145" r="48" fill="#101010"/>
+      <circle cx="1074" cy="145" r="48" fill="url(#shine)"/>
+      <circle cx="1074" cy="145" r="18" fill="#fbf8ed"/>
+      <text x="1074" y="152" font-size="21" font-weight="700" fill="#1a1a1a">8</text>
+    </g>
+  </g>
+</svg>
