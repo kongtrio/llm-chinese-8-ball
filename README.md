@@ -101,6 +101,23 @@ Benchmark options:
 
 Scoring uses win = 3, stalemate = 1, loss = 0. Malformed moves and API failures are tracked separately from pool results so model reliability is not conflated with game skill.
 
+### Example Benchmark Result
+
+Example 60-game GPT-5-family round-robin:
+
+<p align="center">
+  <img src="docs/leaderboard.svg" alt="Benchmark leaderboard: gpt-5 36, gpt-5.1 42, gpt-5.2 48, gpt-5.4 54 points" width="78%">
+</p>
+
+| Model   | Points |  W-L  | Win % (95% CI) |
+| ------- | :----: | :---: | :------------: |
+| gpt-5.4 |   54   | 18-12 |  60% (42-75)   |
+| gpt-5.2 |   48   | 16-14 |  53% (36-70)   |
+| gpt-5.1 |   42   | 14-16 |  47% (30-64)   |
+| gpt-5   |   36   | 12-18 |  40% (25-58)   |
+
+Small samples are directional; use more games when comparing adjacent models.
+
 ## Architecture
 
 ```text
