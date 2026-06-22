@@ -1,9 +1,13 @@
 // USD per 1,000,000 tokens. EDIT as prices change — exact model-ID match only, so dated snapshots
 // (gpt-5.5-2026-04-23) and variants (gpt-5.5-pro) won't be silently mispriced. Unlisted model -> cost null.
 // Verified Jun 2026 from public pricing trackers; confirm against your OpenAI/Anthropic dashboard.
-export interface Price { in: number; out: number }   // reasoning tokens bill at the output rate
+export interface Price {
+  in: number
+  out: number
+} // reasoning tokens bill at the output rate
 
 export const PRICES: Record<string, Price> = {
+  'bot-basic': { in: 0, out: 0 },
   'gpt-5': { in: 1.25, out: 10.0 },
   'gpt-5.1': { in: 1.25, out: 10.0 },
   'gpt-5.2': { in: 1.75, out: 14.0 },

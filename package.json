@@ -1,26 +1,56 @@
 {
-  "name": "llm-pool",
+  "name": "llm-chinese-8-ball",
   "private": true,
   "version": "0.1.0",
+  "description": "Chinese 8-ball browser game and headless LLM benchmark with shared physics, rules, and bot baseline.",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kongtrio/llm-chinese-8-ball.git"
+  },
+  "keywords": [
+    "8-ball",
+    "billiards",
+    "pool",
+    "chinese-8-ball",
+    "llm",
+    "benchmark",
+    "react",
+    "typescript"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "bench": "vite-node src/headless/run.ts --"
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "bench": "vite-node src/headless/run.ts --",
+    "standalone": "npm run build && node scripts/build-standalone.mjs",
+    "standalone:check": "node scripts/check-standalone.mjs",
+    "check": "npm run lint && npm run format:check && npm test && npm run build"
   },
   "dependencies": {
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^10.5.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "prettier": "^3.8.4",
     "typescript": "^5.9.0",
+    "typescript-eslint": "^8.61.1",
     "vite": "^7.1.0",
     "vitest": "^3.2.0"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
   }
 }

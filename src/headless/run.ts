@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { isBotModel } from '../ai/bot'
 import { provider } from '../ai/llm'
 import { runBenchmark } from './benchmark'
 import type { Keys } from './types'
@@ -9,10 +10,16 @@ function parseArgs(argv: string[]) {
     const s = argv[i]
     if (!s.startsWith('--')) continue
     const eq = s.indexOf('=')
-    if (eq > 0) { a[s.slice(2, eq)] = s.slice(eq + 1); continue }   // --flag=value
+    if (eq > 0) {
+      a[s.slice(2, eq)] = s.slice(eq + 1)
+      continue
+    } // --flag=value
     const k = s.slice(2)
     const v = argv[i + 1]
-    if (v != null && !v.startsWith('--')) { a[k] = v; i++ } else a[k] = true   // --flag value | --flag
+    if (v != null && !v.startsWith('--')) {
+      a[k] = v
+      i++
+    } else a[k] = true // --flag value | --flag
   }
   return a
 }
@@ -23,11 +30,13 @@ if (!args.models || args.models === true) {
   console.error(`Usage: npm run bench -- --models <id1,id2,...> [options]
 
   --models        comma-separated model IDs, e.g. claude-opus-4-8,gpt-5  (required)
+                  use bot-basic for the local deterministic bot (no API key)
   --games N            games per pair (default 1; use >=20 for a real ranking)
   --concurrency N      max games in flight (default 3)
   --max-shots N        cap shots/game before it's a draw (default 240)
   --reasoning-effort E low | medium | high for gpt-5*/o* models (default low)
   --out PATH           JSON report path (.md written alongside; default ./bench-results/run-<ISO>.json)
+  --resume             load matching completed games from the report/checkpoint at --out
   --history            feed prior-shot history into prompts (in-context learning; default off)
   --self-play          also pair each model against itself (baseline; default off)
   --verbose            print per-shot log lines
@@ -38,7 +47,10 @@ API keys come from the environment ONLY (never CLI args):
   process.exit(1)
 }
 
-const models = String(args.models).split(',').map(s => s.trim()).filter(Boolean)
+const models = String(args.models)
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
 
 // Load a local, gitignored .env if present so keys can live in a file instead of the shell profile.
 // Shell env still wins (process.loadEnvFile doesn't clobber already-set vars).
@@ -48,6 +60,7 @@ const keys: Keys = { anthropic: process.env.ANTHROPIC_API_KEY ?? '', openai: pro
 // Preflight: every model's provider key must be present before we schedule (and pay for) any game.
 const missing = new Set<string>()
 for (const m of models) {
+  if (isBotModel(m)) continue
   const prov = provider(m)
   if (prov === 'anthropic' && !keys.anthropic.trim()) missing.add('ANTHROPIC_API_KEY (for claude* models)')
   if (prov === 'openai' && !keys.openai.trim()) missing.add('OPENAI_API_KEY (for non-claude models)')
@@ -58,7 +71,8 @@ if (missing.size) {
 }
 
 const games = args.games ? Math.max(1, parseInt(String(args.games), 10) || 1) : 1
-if (games < 20) console.warn(`⚠  --games ${games}: this is a smoke run. Use >=20 games/pair for a meaningful ranking.\n`)
+if (games < 20)
+  console.warn(`⚠  --games ${games}: this is a smoke run. Use >=20 games/pair for a meaningful ranking.\n`)
 
 const effortArg = typeof args['reasoning-effort'] === 'string' ? args['reasoning-effort'] : 'low'
 if (!['low', 'medium', 'high'].includes(effortArg)) {
@@ -72,6 +86,7 @@ await runBenchmark(models, keys, {
   maxShots: args['max-shots'] ? Math.max(1, parseInt(String(args['max-shots']), 10) || 240) : undefined,
   reasoningEffort: effortArg as 'low' | 'medium' | 'high',
   out: typeof args.out === 'string' ? args.out : undefined,
+  resume: !!args.resume,
   history: !!args.history,
   selfPlay: !!args['self-play'],
   verbose: !!args.verbose,

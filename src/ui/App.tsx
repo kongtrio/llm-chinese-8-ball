@@ -9,41 +9,67 @@ import { isLanguage, text, type Language } from '../i18n'
 function BallChip({ n }: { n: number }) {
   const c = colorOf(n)
   const style: CSSProperties = isStripe(n)
-    ? { background: `radial-gradient(circle at 32% 24%, rgba(255,255,255,.8), transparent 28%), linear-gradient(${c} 0 28%, #fff 28% 72%, ${c} 72% 100%)` }
+    ? {
+        background: `radial-gradient(circle at 32% 24%, rgba(255,255,255,.8), transparent 28%), linear-gradient(${c} 0 28%, #fff 28% 72%, ${c} 72% 100%)`,
+      }
     : { background: `radial-gradient(circle at 32% 24%, rgba(255,255,255,.75), transparent 30%), ${c}` }
-  return <span className="chip" style={style}><span className="chipnum">{n}</span></span>
+  return (
+    <span className="chip" style={style}>
+      <span className="chipnum">{n}</span>
+    </span>
+  )
 }
 
 const remainingNums = (balls: Ball[], g: Group) =>
-  balls.filter(b => b.num !== 0 && !b.potted && groupOf(b.num) === g).map(b => b.num).sort((a, b) => a - b)
+  balls
+    .filter((b) => b.num !== 0 && !b.potted && groupOf(b.num) === g)
+    .map((b) => b.num)
+    .sort((a, b) => a - b)
 
 const MODELS: [string, { value: string; label: string }[]][] = [
-  ['Claude (Anthropic)', [
-    { value: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
-    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-    { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
-  ]],
-  ['OpenAI', [
-    { value: 'gpt-5', label: 'GPT-5' },
-    { value: 'gpt-5-mini', label: 'GPT-5 mini' },
-    { value: 'gpt-4.1', label: 'GPT-4.1' },
-    { value: 'gpt-4o', label: 'GPT-4o' },
-  ]],
+  ['Local', [{ value: 'bot-basic', label: 'Basic bot' }]],
+  [
+    'Claude (Anthropic)',
+    [
+      { value: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
+      { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+      { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+    ],
+  ],
+  [
+    'OpenAI',
+    [
+      { value: 'gpt-5', label: 'GPT-5' },
+      { value: 'gpt-5-mini', label: 'GPT-5 mini' },
+      { value: 'gpt-4.1', label: 'GPT-4.1' },
+      { value: 'gpt-4o', label: 'GPT-4o' },
+    ],
+  ],
 ]
 
 function useLocal<T>(key: string, init: T): [T, (v: T) => void] {
   const [v, setV] = useState<T>(() => {
     const s = localStorage.getItem(key)
     if (s == null) return init
-    try { return JSON.parse(s) as T } catch { return init }
+    try {
+      return JSON.parse(s) as T
+    } catch {
+      return init
+    }
   })
-  return [v, (nv: T) => { setV(nv); localStorage.setItem(key, JSON.stringify(nv)) }]
+  return [
+    v,
+    (nv: T) => {
+      setV(nv)
+      localStorage.setItem(key, JSON.stringify(nv))
+    },
+  ]
 }
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const engineRef = useRef<GameEngine | null>(null)
-  const [, force] = useReducer(x => x + 1, 0)
+  const [, force] = useReducer((x) => x + 1, 0)
   const [language, setLanguage] = useLocal<Language>('pool.language.v2', 'en')
   const lang = isLanguage(language) ? language : 'en'
   const t = text[lang].ui
@@ -61,10 +87,16 @@ export default function App() {
     engineRef.current = eng
     eng.setLanguage(lang)
     if (import.meta.env.DEV) (window as unknown as { engine: GameEngine }).engine = eng
-    eng.keys = keys; eng.ui.spinX = spin.x; eng.ui.spinY = spin.y
+    eng.setKeys(keys)
+    eng.ui.spinX = spin.x
+    eng.ui.spinY = spin.y
     const off = eng.on(force)
-    eng.start(); eng.newGame(players)
-    return () => { off(); eng.destroy() }
+    eng.start()
+    eng.newGame(players)
+    return () => {
+      off()
+      eng.destroy()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -74,21 +106,31 @@ export default function App() {
     document.title = lang === 'zh' ? '中式八球 - 真人 vs LLM' : 'Chinese 8-Ball - Human vs LLM'
     engineRef.current?.setLanguage(lang)
   }, [lang])
-  useEffect(() => { if (engineRef.current) engineRef.current.keys = keys }, [keys])
   useEffect(() => {
-    const e = engineRef.current; if (!e) return
-    e.ui.spinX = spin.x; e.ui.spinY = spin.y
+    engineRef.current?.setKeys(keys)
+  }, [keys])
+  useEffect(() => {
+    const e = engineRef.current
+    if (!e) return
+    e.ui.spinX = spin.x
+    e.ui.spinY = spin.y
   }, [spin])
 
   const eng = engineRef.current
   const setPlayer = (i: number, patch: Partial<PlayerConfig>) =>
     setPlayers(players.map((p, j) => (j === i ? { ...p, ...patch } : p)))
+  const setPlayerType = (i: number, type: PlayerType) =>
+    setPlayer(i, {
+      type,
+      ...(type === 'bot' ? { model: 'bot-basic' } : {}),
+      ...(type === 'llm' && players[i]?.model.startsWith('bot-') ? { model: 'gpt-5' } : {}),
+    })
 
   const canvasPoint = (e: PointerEvent<HTMLCanvasElement>) => {
     const r = e.currentTarget.getBoundingClientRect()
     return {
-      x: (e.clientX - r.left) * CANVAS_W / r.width,
-      y: (e.clientY - r.top) * CANVAS_H / r.height,
+      x: ((e.clientX - r.left) * CANVAS_W) / r.width,
+      y: ((e.clientY - r.top) * CANVAS_H) / r.height,
     }
   }
 
@@ -116,7 +158,7 @@ export default function App() {
     else engine.endPull()
   }
 
-  const pullPower = Math.round(((eng?.pull?.power ?? eng?.ui.power ?? 0) * 100))
+  const pullPower = Math.round((eng?.pull?.power ?? eng?.ui.power ?? 0) * 100)
 
   return (
     <div id="wrap">
@@ -126,7 +168,12 @@ export default function App() {
             <div className="eyebrow">LLM Pool Table</div>
             <h1>{lang === 'zh' ? '中式八球' : 'Chinese 8-Ball'}</h1>
           </div>
-          <select className="langSelect" value={lang} aria-label={t.langLabel} onChange={e => setLanguage(e.target.value as Language)}>
+          <select
+            className="langSelect"
+            value={lang}
+            aria-label={t.langLabel}
+            onChange={(e) => setLanguage(e.target.value as Language)}
+          >
             <option value="en">{t.english}</option>
             <option value="zh">{t.chinese}</option>
           </select>
@@ -140,7 +187,10 @@ export default function App() {
         <details className="card shotCard optionPanel" open>
           <summary>{t.yourShot}</summary>
           <div className="optionBody">
-            <label className="meterLabel"><span>{t.pullPower}</span><strong>{pullPower}%</strong></label>
+            <label className="meterLabel">
+              <span>{t.pullPower}</span>
+              <strong>{pullPower}%</strong>
+            </label>
             <div className="pullMeter" aria-label={t.pullPower} aria-valuenow={pullPower} role="meter">
               <span style={{ width: `${pullPower}%` }} />
             </div>
@@ -163,30 +213,43 @@ export default function App() {
                 return (
                   <div key={i} className={'player' + (active ? ' active' : '')}>
                     <label>
-                      {active && <span className="turn">▶ </span>}{t.player(i + 1)}
+                      {active && <span className="turn">▶ </span>}
+                      {t.player(i + 1)}
                       {active && <span className="turn"> · {t.toPlay}</span>}
                       {group && <span className="grouptag">{text[lang].game.group(group)}</span>}
                     </label>
                     <div className="prow">
-                      <select value={p.type} onChange={e => setPlayer(i, { type: e.target.value as PlayerType })}>
+                      <select value={p.type} onChange={(e) => setPlayerType(i, e.target.value as PlayerType)}>
                         <option value="human">{t.human}</option>
+                        <option value="bot">{t.bot}</option>
                         <option value="llm">LLM</option>
                       </select>
-                      <select value={p.model} onChange={e => setPlayer(i, { model: e.target.value })}>
+                      <select value={p.model} onChange={(e) => setPlayer(i, { model: e.target.value })}>
                         {MODELS.map(([grp, opts]) => (
                           <optgroup key={grp} label={grp}>
-                            {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            {opts.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
                           </optgroup>
                         ))}
                       </select>
                     </div>
                     {group ? (
                       <div className="balls">
-                        {onEight
-                          ? <><BallChip n={8} /><span className="hint">- {t.onEightBall}</span></>
-                          : remaining.map(n => <BallChip key={n} n={n} />)}
+                        {onEight ? (
+                          <>
+                            <BallChip n={8} />
+                            <span className="hint">- {t.onEightBall}</span>
+                          </>
+                        ) : (
+                          remaining.map((n) => <BallChip key={n} n={n} />)
+                        )}
                       </div>
-                    ) : <div className="balls hint">{t.groupUndecided}</div>}
+                    ) : (
+                      <div className="balls hint">{t.groupUndecided}</div>
+                    )}
                   </div>
                 )
               })}
@@ -197,18 +260,30 @@ export default function App() {
         <details className="card compactPanel">
           <summary>{t.apiKeys}</summary>
           <label>{t.anthropicKey}</label>
-          <input type="password" placeholder="sk-ant-..." value={keys.anthropic}
-            onChange={e => setKeys({ ...keys, anthropic: e.target.value })} />
+          <input
+            type="password"
+            placeholder="sk-ant-..."
+            value={keys.anthropic}
+            onChange={(e) => setKeys({ ...keys, anthropic: e.target.value })}
+          />
           <label>{t.openaiKey}</label>
-          <input type="password" placeholder="sk-..." value={keys.openai}
-            onChange={e => setKeys({ ...keys, openai: e.target.value })} />
+          <input
+            type="password"
+            placeholder="sk-..."
+            value={keys.openai}
+            onChange={(e) => setKeys({ ...keys, openai: e.target.value })}
+          />
           <p className="hint">{t.apiHelp}</p>
         </details>
 
         <details className="card compactPanel logPanel" open>
           <summary>{t.log}</summary>
           <div id="log">
-            {eng?.log.map((l, i) => <div key={i} className={l.cls}>{l.text}</div>)}
+            {eng?.log.map((l, i) => (
+              <div key={i} className={l.cls}>
+                {l.text}
+              </div>
+            ))}
           </div>
           <button style={{ marginTop: 8 }} onClick={() => engineRef.current?.clearMemory()}>
             {t.clearMemory(eng?.memory.length ?? 0)}
@@ -220,7 +295,10 @@ export default function App() {
       <main id="playArea">
         <div className="tableShell">
           <canvas
-            ref={canvasRef} className="table" width={CANVAS_W} height={CANVAS_H}
+            ref={canvasRef}
+            className="table"
+            width={CANVAS_W}
+            height={CANVAS_H}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}

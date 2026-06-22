@@ -17,7 +17,9 @@ export function SpinPad({ x, y, onChange }: { x: number; y: number; onChange: (x
     g.setTransform(dpr, 0, 0, dpr, 0, 0)
     g.clearRect(0, 0, size, size)
 
-    const cx = size / 2, cy = size / 2, r = 45
+    const cx = size / 2,
+      cy = size / 2,
+      r = 45
     const ball = g.createRadialGradient(cx - 16, cy - 18, 4, cx, cy, r)
     ball.addColorStop(0, '#fffaf0')
     ball.addColorStop(0.44, '#efe6d2')
@@ -68,7 +70,9 @@ export function SpinPad({ x, y, onChange }: { x: number; y: number; onChange: (x
 
   const update = (event: PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect()
-    const cx = rect.width / 2, cy = rect.height / 2, r = rect.width * 0.4
+    const cx = rect.width / 2,
+      cy = rect.height / 2,
+      r = rect.width * 0.4
     const dx = (event.clientX - rect.left - cx) / r
     const dy = (event.clientY - rect.top - cy) / r
     const m = Math.hypot(dx, dy)
@@ -82,11 +86,13 @@ export function SpinPad({ x, y, onChange }: { x: number; y: number; onChange: (x
       role="slider"
       aria-label="Cue ball spin"
       aria-valuetext={`${x.toFixed(2)}, ${y.toFixed(2)}`}
-      onPointerDown={e => {
+      onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId)
         update(e)
       }}
-      onPointerMove={e => { if (e.buttons) update(e) }}
+      onPointerMove={(e) => {
+        if (e.buttons) update(e)
+      }}
       onDoubleClick={() => onChange(0, 0)}
     />
   )

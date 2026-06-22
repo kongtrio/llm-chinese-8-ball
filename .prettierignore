@@ -1,5 +1,6 @@
 node_modules/
 dist/
 bench-results/
+standalone.html
+package-lock.json
 *.tsbuildinfo
-.env

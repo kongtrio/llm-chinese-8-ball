@@ -1,6 +1,4 @@
-import {
-  L, W, BR, PXPM, RAILPX, CANVAS_W, CANVAS_H, RPX, POCKETS, colorOf, isStripe,
-} from './constants'
+import { L, W, BR, PXPM, RAILPX, CANVAS_W, CANVAS_H, RPX, POCKETS, colorOf, isStripe } from './constants'
 import type { Ball } from './types'
 
 const SX = (x: number) => RAILPX + x * PXPM
@@ -11,10 +9,10 @@ export const toMetres = (px: number, py: number) => ({ x: (px - RAILPX) / PXPM, 
 
 export interface View {
   balls: Ball[]
-  pointer: { x: number; y: number }   // metres
+  pointer: { x: number; y: number } // metres
   pull: PullView | null
-  aiming: boolean                     // human is aiming -- draw guide
-  placing: boolean                    // human ball-in-hand -- draw ghost cue
+  aiming: boolean // human is aiming -- draw guide
+  placing: boolean // human ball-in-hand -- draw ghost cue
 }
 
 export interface PullView {
@@ -34,14 +32,30 @@ export function render(ctx: CanvasRenderingContext2D, v: View) {
   if (v.placing) {
     ctx.save()
     ctx.globalAlpha = 0.55
-    drawBall(ctx, { num: 0, x: v.pointer.x, y: v.pointer.y, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, rx: 0, ry: 0, rz: 0, potted: false })
+    drawBall(ctx, {
+      num: 0,
+      x: v.pointer.x,
+      y: v.pointer.y,
+      vx: 0,
+      vy: 0,
+      wx: 0,
+      wy: 0,
+      wz: 0,
+      rx: 0,
+      ry: 0,
+      rz: 0,
+      potted: false,
+    })
     ctx.restore()
   }
   for (const b of v.balls) if (!b.potted) drawBall(ctx, b)
 }
 
 function drawTable(ctx: CanvasRenderingContext2D) {
-  const feltX = RAILPX, feltY = RAILPX, feltW = L * PXPM, feltH = W * PXPM
+  const feltX = RAILPX,
+    feltY = RAILPX,
+    feltW = L * PXPM,
+    feltH = W * PXPM
 
   const rail = ctx.createLinearGradient(0, 0, 0, CANVAS_H)
   rail.addColorStop(0, '#8b5530')
@@ -79,7 +93,9 @@ function drawTable(ctx: CanvasRenderingContext2D) {
   ctx.stroke()
 
   for (const p of POCKETS) {
-    const x = SX(p.x), y = SY(p.y), r = p.r * PXPM
+    const x = SX(p.x),
+      y = SY(p.y),
+      r = p.r * PXPM
     const pocket = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, r * 0.2, x, y, r)
     pocket.addColorStop(0, '#1b1b1b')
     pocket.addColorStop(0.58, '#030303')
@@ -95,7 +111,8 @@ function drawTable(ctx: CanvasRenderingContext2D) {
 }
 
 function drawBallShadow(ctx: CanvasRenderingContext2D, b: Ball) {
-  const x = SX(b.x), y = SY(b.y)
+  const x = SX(b.x),
+    y = SY(b.y)
   const speed = Math.hypot(b.vx, b.vy)
   const blur = Math.min(14, 4 + speed * 2.2)
   ctx.save()
@@ -115,14 +132,19 @@ function drawBallShadow(ctx: CanvasRenderingContext2D, b: Ball) {
     ctx.lineCap = 'round'
     ctx.beginPath()
     ctx.moveTo(x - Math.cos(a) * RPX * 0.4, y - Math.sin(a) * RPX * 0.4)
-    ctx.lineTo(x - Math.cos(a) * RPX * (1.2 + Math.min(speed, 4) * 0.35), y - Math.sin(a) * RPX * (1.2 + Math.min(speed, 4) * 0.35))
+    ctx.lineTo(
+      x - Math.cos(a) * RPX * (1.2 + Math.min(speed, 4) * 0.35),
+      y - Math.sin(a) * RPX * (1.2 + Math.min(speed, 4) * 0.35),
+    )
     ctx.stroke()
     ctx.restore()
   }
 }
 
 function drawBall(ctx: CanvasRenderingContext2D, b: Ball) {
-  const x = SX(b.x), y = SY(b.y), base = b.num === 0 ? '#f7f2e6' : colorOf(b.num)
+  const x = SX(b.x),
+    y = SY(b.y),
+    base = b.num === 0 ? '#f7f2e6' : colorOf(b.num)
   const face = faceOffset(b)
 
   ctx.save()
@@ -229,16 +251,32 @@ function faceOffset(b: Ball) {
   return { x, y, scale: 1 - edge * 0.28 }
 }
 
-function drawAim(ctx: CanvasRenderingContext2D, balls: Ball[], pointer: { x: number; y: number }, pull: PullView | null) {
-  const cue = balls[0]; if (cue.potted) return
+function drawAim(
+  ctx: CanvasRenderingContext2D,
+  balls: Ball[],
+  pointer: { x: number; y: number },
+  pull: PullView | null,
+) {
+  const cue = balls[0]
+  if (cue.potted) return
   const ang = pull?.active ? pull.angle : Math.atan2(pointer.y - cue.y, pointer.x - cue.x)
-  const dx = Math.cos(ang), dy = Math.sin(ang)
-  let best: Ball | null = null, bt = Infinity
+  const dx = Math.cos(ang),
+    dy = Math.sin(ang)
+  let best: Ball | null = null,
+    bt = Infinity
   for (const b of balls) {
     if (b.num === 0 || b.potted) continue
-    const ox = b.x - cue.x, oy = b.y - cue.y, t = ox * dx + oy * dy; if (t < 0) continue
-    const perp = Math.hypot(ox - dx * t, oy - dy * t); if (perp >= 2 * BR) continue
-    const tc = t - Math.sqrt(4 * BR * BR - perp * perp); if (tc > 0 && tc < bt) { bt = tc; best = b }
+    const ox = b.x - cue.x,
+      oy = b.y - cue.y,
+      t = ox * dx + oy * dy
+    if (t < 0) continue
+    const perp = Math.hypot(ox - dx * t, oy - dy * t)
+    if (perp >= 2 * BR) continue
+    const tc = t - Math.sqrt(4 * BR * BR - perp * perp)
+    if (tc > 0 && tc < bt) {
+      bt = tc
+      best = b
+    }
   }
   const end = best ? { x: cue.x + dx * bt, y: cue.y + dy * bt } : { x: cue.x + dx * 5, y: cue.y + dy * 5 }
   ctx.save()
@@ -256,7 +294,10 @@ function drawAim(ctx: CanvasRenderingContext2D, balls: Ball[], pointer: { x: num
   ctx.arc(SX(cue.x), SY(cue.y), RPX + 4, 0, TAU)
   ctx.stroke()
   if (best) {
-    const hitX = SX(end.x), hitY = SY(end.y), bestX = SX(best.x), bestY = SY(best.y)
+    const hitX = SX(end.x),
+      hitY = SY(end.y),
+      bestX = SX(best.x),
+      bestY = SY(best.y)
     ctx.save()
     ctx.shadowColor = 'rgba(255,211,115,.7)'
     ctx.shadowBlur = 16
@@ -287,12 +328,17 @@ function drawAim(ctx: CanvasRenderingContext2D, balls: Ball[], pointer: { x: num
 }
 
 function drawCuePull(ctx: CanvasRenderingContext2D, cue: Ball, pull: PullView) {
-  const cueX = SX(cue.x), cueY = SY(cue.y)
-  const backX = SX(pull.x), backY = SY(pull.y)
-  const dx = Math.cos(pull.angle), dy = Math.sin(pull.angle)
+  const cueX = SX(cue.x),
+    cueY = SY(cue.y)
+  const backX = SX(pull.x),
+    backY = SY(pull.y)
+  const dx = Math.cos(pull.angle),
+    dy = Math.sin(pull.angle)
   const stickBack = 28 + pull.power * 112
-  const buttX = cueX - dx * stickBack, buttY = cueY - dy * stickBack
-  const tipX = cueX - dx * (RPX + 5), tipY = cueY - dy * (RPX + 5)
+  const buttX = cueX - dx * stickBack,
+    buttY = cueY - dy * stickBack
+  const tipX = cueX - dx * (RPX + 5),
+    tipY = cueY - dy * (RPX + 5)
 
   ctx.save()
   ctx.lineCap = 'round'
@@ -331,7 +377,11 @@ function drawCuePull(ctx: CanvasRenderingContext2D, cue: Ball, pull: PullView) {
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  ctx.beginPath(); ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath()
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
 }
